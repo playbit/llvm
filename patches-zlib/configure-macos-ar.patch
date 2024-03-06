@@ -1,0 +1,19 @@
+fix issue with zlib config ignoring AR and unconditionally using system libtool
+--- a/configure 2023-10-18 12:29:24.000000000 -0700
++++ b/configure 2023-10-18 12:29:39.000000000 -0700
+@@ -265,14 +265,7 @@
+         SHAREDLIBV=libz.$VER$shared_ext
+         SHAREDLIBM=libz.$VER1$shared_ext
+         LDSHARED=${LDSHARED-"$cc -dynamiclib -install_name $libdir/$SHAREDLIBM -compatibility_version $VER1 -current_version $VER3"}
+-        if "${CROSS_PREFIX}libtool" -V 2>&1 | grep Apple > /dev/null; then
+-            AR="${CROSS_PREFIX}libtool"
+-        elif libtool -V 2>&1 | grep Apple > /dev/null; then
+-            AR="libtool"
+-        else
+-            AR="/usr/bin/libtool"
+-        fi
+-        ARFLAGS="-o" ;;
++        ;;
+   *)
+         LDSHARED=${LDSHARED-"$cc -shared"} ;;
+   esac

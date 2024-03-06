@@ -1,0 +1,5 @@
+/build
+/build-s1
+/build-*
+/_archive
+*.dSYM

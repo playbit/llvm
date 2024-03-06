@@ -1,0 +1,26 @@
+
+sysroot 1 -- stuff needed at runtime
+  /lib/ld      -- dynamic linker
+  /lib/libc.so -- dynamic libc
+
+sysroot 2 -- SDK (development sysroot)
+  /lib/libc.a crt1.o et al    -- libc libraries
+  /lib/libc++.a et al         -- libc++ libraries
+  /usr/include/stdlib.h et al -- libc headers
+  /usr/include/linux/         -- kernel headers
+  /usr/include/c++/v1/        -- libc++ headers
+
+sysroot 3 -- development tools
+  /bin/clang et al      -- compiler executables
+  /lib/clang/17/include -- compiler headers (e.g. stdint.h)
+  /lib/clang/17/TARGET/builtins.a          -- compiler built-ins
+  /lib/clang/17/TARGET/libclang_rt.a et al -- compiler built-ins (alt)
+  /lib/clang/17/TARGET/libclang_rt.ubsan.a et al -- compiler utils
+
+sysroot 4 -- llvm development files
+  /lib/libLLVMCore.a et al  -- llvm libraries
+  /usr/include/llvm et al   -- llvm headers
+  /lib/libz.a et al         -- llvm dependency libraries
+  /usr/include/zlib.h et al -- llvm dependency headers
+  /lib/libc++.a et al       -- libc++ libraries (ensure ABI compatibility)
+  /usr/include/c++/v1/      -- libc++ headers (ensure ABI compatibility)
