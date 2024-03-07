@@ -217,7 +217,7 @@ LLVM_STAGE1_SRC=$BUILD_DIR_GENERIC/s1-llvm-$LLVM_VERSION
 _run_if_missing "$LLVM_STAGE1_SRC/LICENSE.TXT" _llvm-stage1-source.sh
 echo "Using llvm source at ${LLVM_STAGE1_SRC##$PWD0/}"
 
-# build llvm stage 1
+# build llvm stage 1 (for host)
 LLVM_STAGE1_DIR=$BUILD_DIR/s1-llvm
 _run_if_missing "$LLVM_STAGE1_DIR/bin/llvm-tblgen" _llvm-stage1.sh
 echo "Using llvm-stage1 at ${LLVM_STAGE1_DIR##$PWD0/}/"
@@ -359,10 +359,18 @@ LIBXML2_DIR=$BUILD_DIR/s2-libxml2-$LIBXML2_VERSION
 _run_if_missing "$LIBXML2_DIR/lib/libxml2.a" _libxml2.sh
 echo "Using libxml2.a at ${LIBXML2_DIR##$PWD0/}/"
 
-# build llvm stage 2
+# build llvm stage 2 (for target, not host)
 LLVM_STAGE2_DIR=$BUILD_DIR/s2-llvm
-_run_if_missing "$LLVM_STAGE2_DIR/bin/clang-xxx" _llvm-stage2.sh
+_run_if_missing "$LLVM_STAGE2_DIR/bin/clang" _llvm-stage2.sh
 echo "Using llvm-stage2 at ${LLVM_STAGE2_DIR##$PWD0/}/"
+
+# build compiler-rt
+COMPILER_RT_DIR=$BUILD_DIR/s2-compiler-rt
+_run_if_missing \
+  "$COMPILER_RT_DIR/lib/linux/$TARGET_TRIPLE/libclang_rt.asan.a" \
+  _llvm-compiler-rt.sh
+echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/"
+
 exit
 
 # # build llvm runtimes
