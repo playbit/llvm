@@ -10,6 +10,8 @@ for f in $(echo "$MUSL_PATCHDIR"/*.patch | sort); do
   patch -p1 < "$f"
 done
 
+ENABLE_EXECINFO=true
+
 LDFLAGS="$LDFLAGS -Wl,-soname,libc.so" \
 ./configure \
   --prefix="" \
@@ -21,6 +23,25 @@ LDFLAGS="$LDFLAGS -Wl,-soname,libc.so" \
   --mandir=/usr/share/man \
   --infodir=/usr/share/info \
   --localstatedir=/var
+
+if $ENABLE_EXECINFO; then
+  # install headers
+  make DESTDIR=install1 install-headers
+  echo "CC libexecinfo_stacktraverse.o"
+  $CC $CFLAGS -O2 -fno-strict-aliasing -fstack-protector \
+    -Iinstall1/usr/include \
+    -c "$MUSL_PATCHDIR/libexecinfo/stacktraverse.c" \
+    -o libexecinfo_stacktraverse.o
+  echo "CC libexecinfo_execinfo.o"
+  $CC $CFLAGS -O2 -fno-strict-aliasing -fstack-protector \
+    -Iinstall1/usr/include \
+    -c "$MUSL_PATCHDIR/libexecinfo/execinfo.c" \
+    -o libexecinfo_execinfo.o
+  # patch makefile
+  EXECINFO_OBJS="libexecinfo_stacktraverse.o libexecinfo_execinfo.o"
+  sed -i '' -E -e "s@^(AOBJS = )@\1${EXECINFO_OBJS} @" Makefile
+  sed -i '' -E -e "s@^(LOBJS = )@\1${EXECINFO_OBJS} @" Makefile
+fi
 
 make -j$NCPU
 make DESTDIR="$SYSROOT" install
@@ -42,11 +63,14 @@ rm -f "$SYSROOT/lib/libssp_nonshared.a"
 ar r "$SYSROOT/lib/libssp_nonshared.a" /tmp/__stack_chk_fail_local.o
 
 _popd
-rm -rf "$MUSL_BUILD_DIR"
+#rm -rf "$MUSL_BUILD_DIR"
 
 # fix dynamic linker symlink
 rm "$SYSROOT/lib/ld-musl-x86_64.so.1"
 ln -s libc.so "$SYSROOT/lib/ld"
+
+# move libc.so aside for now to avoid accidentally linking with it
+mv "$SYSROOT/lib/libc.so" "$SYSROOT/lib/libc-TEMPORARILY_RENAMED.so"
 
 # Installs a few BSD compatibility headers
 # (cdefs, queue, tree; known as bsd-compat-headers in alpine)
@@ -55,3 +79,8 @@ mkdir -p "$SYSROOT/usr/include/sys"
 install -v -m0644 sys-cdefs.h "$SYSROOT/usr/include/sys/cdefs.h"
 install -v -m0644 sys-queue.h "$SYSROOT/usr/include/sys/queue.h"
 install -v -m0644 sys-tree.h  "$SYSROOT/usr/include/sys/tree.h"
+
+# install execinfo.h
+install -v -m0644 \
+  "$MUSL_PATCHDIR/libexecinfo/execinfo.h" \
+  "$SYSROOT/usr/include/execinfo.h"
