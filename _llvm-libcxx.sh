@@ -2,6 +2,10 @@ SRCDIR=$LLVM_STAGE2_SRC/compiler-rt
 BUILDDIR=$LIBCXX_DIR/build
 DESTDIR=$LIBCXX_DIR
 
+# CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR/"
+# LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR/"
+LDFLAGS="$LDFLAGS -L$LLVM_STAGE1_DIR/lib"
+
 rm -rf "$BUILDDIR"
 
 CMAKE_ARGS=()
@@ -10,9 +14,9 @@ if [ "$CBUILD" != "$CHOST" ]; then
     linux) CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Linux ) ;;
     macos) CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Darwin ) ;;
   esac
-  case "$TARGET_SYS" in
-    linux) CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Linux ) ;;
-    macos) CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Darwin ) ;;
+  case "$TARGET_TRIPLE" in
+    *-linux*) CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Linux ) ;;
+    *-macos*) CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Darwin ) ;;
   esac
 fi
 
@@ -27,10 +31,14 @@ cmake -G Ninja -S "$LLVM_STAGE2_SRC/runtimes" -B "$BUILDDIR" \
   -DCMAKE_RANLIB="$RANLIB" \
   -DCMAKE_LINKER="$LD" \
   \
+  -DCMAKE_ASM_COMPILER_TARGET="$TARGET_TRIPLE" \
+  -DCMAKE_C_COMPILER_TARGET="$TARGET_TRIPLE" \
+  -DCMAKE_CXX_COMPILER_TARGET="$TARGET_TRIPLE" \
+  \
   -DCMAKE_ASM_FLAGS="$CFLAGS" \
   -DCMAKE_C_FLAGS="$CFLAGS" \
   -DCMAKE_CXX_FLAGS="$CFLAGS" \
-  -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS -L$LLVM_STAGE1_DIR/lib" \
+  -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
   \
   -DCMAKE_SYSROOT="$SYSROOT" \
   \
@@ -68,5 +76,3 @@ ninja -C "$BUILDDIR" cxx cxxabi unwind
 ninja -C "$BUILDDIR" install
 
 rm -rf "$BUILDDIR"
-mkdir "$DESTDIR/usr"
-mv "$DESTDIR/include" "$DESTDIR/usr/include"

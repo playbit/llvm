@@ -1,5 +1,6 @@
 
 sysroot 1 -- stuff needed at runtime
+  /bin/ldd     -- print shared libraries
   /lib/ld      -- dynamic linker
   /lib/libc.so -- dynamic libc
 

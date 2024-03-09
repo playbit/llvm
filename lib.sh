@@ -46,6 +46,18 @@ _array_println() { # <prefix> <element> ...
   for s in "$@"; do echo "$prefix$s"; done
 }
 
+_array_println_slashesc() { # <prefix> <element> ...
+  local prefix=$1;shift
+  local args=( "$@" )
+  for ((i = 0; i < $#; i++ )); do
+    if [ $(( i + 1 )) -lt $# ]; then
+      echo "$prefix${args[i]} \\"
+    else
+      echo "$prefix${args[i]}"
+    fi
+  done
+}
+
 _copy() { # <arg to cp> ...
   printf "copy"
   local past=

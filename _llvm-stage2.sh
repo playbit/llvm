@@ -1,9 +1,9 @@
 SELF_SCRIPT=$(realpath "${BASH_SOURCE[0]}")
+ENABLE_LLVM_DEV_FILES=false
+
 DIST_COMPONENTS=(
   clang \
   clang-format \
-  clang-headers \
-  clang-libraries \
   clang-resource-headers \
   lld \
   llvm-ar \
@@ -12,8 +12,6 @@ DIST_COMPONENTS=(
   llvm-cov \
   llvm-dlltool \
   llvm-dwarfdump \
-  llvm-headers \
-  llvm-libraries \
   llvm-libtool-darwin \
   llvm-nm \
   llvm-objcopy \
@@ -30,15 +28,25 @@ DIST_COMPONENTS=(
   llvm-tblgen \
   llvm-xray \
 )
-EXTRA_COMPONENTS=( # components without install targets
-  clang-tblgen \
-  lib/liblldCOFF.a \
-  lib/liblldCommon.a \
-  lib/liblldELF.a \
-  lib/liblldMachO.a \
-  lib/liblldMinGW.a \
-  lib/liblldWasm.a \
-)
+# components without install targets
+EXTRA_COMPONENTS=()
+EXTRA_COMPONENTS+=( clang-tblgen )
+if $ENABLE_LLVM_DEV_FILES; then
+  DIST_COMPONENTS+=(
+    clang-headers \
+    clang-libraries \
+    llvm-headers \
+    llvm-libraries \
+  )
+  EXTRA_COMPONENTS+=(
+    lib/liblldCOFF.a \
+    lib/liblldCommon.a \
+    lib/liblldELF.a \
+    lib/liblldMachO.a \
+    lib/liblldMinGW.a \
+    lib/liblldWasm.a \
+  )
+fi
 
 CMAKE_C_FLAGS=( \
   $CFLAGS \
@@ -50,32 +58,29 @@ CMAKE_C_FLAGS=( \
 # that CMAKE_CXX_FLAGS preceeds CFLAGS for C++ compilation, so that e.g.
 # include <stdlib.h> loads c++/v1/stdlib.h (and then sysroot/include/stdlib.h)
 CMAKE_CXX_FLAGS=( \
-  "-I$LIBCXX_DIR/usr/include/c++/v1" \
-  "-isystem$SYSROOT/usr/include" \
+  "-I$LIBCXX_DIR/include/c++/v1" \
+  "-I$LIBCXX_DIR/include" \
+  "-isystem$SYSROOT/include" \
 )
 CMAKE_LD_FLAGS=( $LDFLAGS -lc++ -lc++abi )
 EXTRA_CMAKE_ARGS=( -Wno-dev )
 # CMAKE_CXX_FLAGS+=( -nostdinc++ )
 # CMAKE_LD_FLAGS+=( -nostdlib++ )
 
-# case "$TARGET_SYS" in
-#   linux)
-#     CMAKE_LD_FLAGS+=( -static )
-#     EXTRA_CMAKE_ARGS+=(
-#       -DLLVM_DEFAULT_TARGET_TRIPLE="$TARGET_TRIPLE" \
-#       -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
-#     )
-#     ;;
-# esac
+ENABLE_STATIC_LINKING=true
+CMAKE_C_FLAGS+=( -static )
+CMAKE_LD_FLAGS+=( -static )
 
 # note: there are clang-specific option, even though it doesn't start with CLANG_
 # See: llvm/clang/CMakeLists.txt
 #
 # DEFAULT_SYSROOT sets the default --sysroot=<path>.
 # Note that if sysroot is relative, clang will treat it as relative to itself.
-# I.e. sysroot=foo with clang at /bar/bin/clang results in sysroot=/bar/bin/foo.
+# I.e. sysroot=foo with clang at /bin/clang results in sysroot=/bin/foo.
 # See line ~200 of clang/lib/Driver/Driver.cpp
-EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="native-sysroot/" )
+TARGET_ARCH=${TARGET_TRIPLE%%-*}
+EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="" )
+# EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="../sysroot-$TARGET_ARCH/" )
 #
 # C_INCLUDE_DIRS is a colon-separated list of paths to search by default.
 # Relative paths are relative to sysroot.
@@ -99,23 +104,23 @@ EXTRA_CMAKE_ARGS+=( -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON )
 # EXTRA_CMAKE_ARGS+=( -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON )
 
 # CLANG_RESOURCE_DIR: /lib/clang/VERSION by default
-# EXTRA_CMAKE_ARGS+=( -DCLANG_RESOURCE_DIR=clangres )
+EXTRA_CMAKE_ARGS+=( -DCLANG_RESOURCE_DIR=../lib/clang )
 
 
-
-ENABLE_BUILTINS=true
+ENABLE_BUILTINS=false
 if $ENABLE_BUILTINS; then
   # TODO: build all sysroots, then enable runtimes for all targets
   TARGET_TRIPLES=( $TARGET_TRIPLE ) # XXX FIXME
   EXTRA_CMAKE_ARGS+=(
-    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON \
+    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
     -DLLVM_BUILTIN_TARGETS="$(_array_join ";" ${TARGET_TRIPLES[@]})" \
     -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
   )
   DIST_COMPONENTS+=( builtins )
   RUNTIMES_INSTALL_RPATH="\$ORIGIN/../lib;/lib"
-  # BUILTINS_CFLAGS=( -fPIC -resource-dir=$BUILTINS_DIR/ -isystem$LIBCXX_DIR/usr/include )
+  # BUILTINS_CFLAGS=( -fPIC -resource-dir=$BUILTINS_DIR/ -isystem$LIBCXX_DIR/include )
   BUILTINS_CFLAGS=( -fPIC )
+  OUTER_TARGET_TRIPLE=$TARGET_TRIPLE
   for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
     EXTRA_CMAKE_ARGS+=(
       -DBUILTINS_${TARGET_TRIPLE}_CMAKE_BUILD_TYPE=MinSizeRel \
@@ -164,6 +169,7 @@ if $ENABLE_BUILTINS; then
       -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_ENABLE_STATIC_UNWINDER=ON \
     )
   done
+  TARGET_TRIPLE=$OUTER_TARGET_TRIPLE
 fi
 
 ENABLE_RUNTIMES=false
@@ -179,6 +185,7 @@ if $ENABLE_RUNTIMES; then
   # if $ENABLE_BUILTINS; then
   #   RUNTIMES_CFLAGS+=( -resource-dir=$BUILTINS_DIR/ )
   # fi
+  OUTER_TARGET_TRIPLE=$TARGET_TRIPLE
   for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
     EXTRA_CMAKE_ARGS+=(
       -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_BUILD_TYPE=MinSizeRel \
@@ -239,6 +246,7 @@ if $ENABLE_RUNTIMES; then
       -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_LINK_TESTS_WITH_SHARED_LIBCXX=OFF \
     )
   done
+  TARGET_TRIPLE=$OUTER_TARGET_TRIPLE
 fi
 
 
@@ -265,6 +273,9 @@ EXTRA_CMAKE_ARGS+=(
   -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=ON \
 )
 
+# EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=$TARGET_TRIPLE )
+EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=$TARGET_ARCH-unknown-playbit )
+
 CMAKE_LD_FLAGS+=( -L"$SYSROOT/lib" )
 # CMAKE_LD_FLAGS+=( -L"$LIBCXX_STAGE2/lib" )
 
@@ -280,15 +291,16 @@ DESTDIR=$LLVM_STAGE2_DIR
 mkdir -p "$BUILD_DIR"
 _pushd "$BUILD_DIR"
 
-if [ ! -f CMakeCache.txt ] || [ "$SELF_SCRIPT" -nt CMakeCache.txt ]; then
-# if false; then
+if [ -z "${PB_LLVM_SKIP_CONFIG:-}" ] &&
+   [ ! -f CMakeCache.txt -o "$SELF_SCRIPT" -nt CMakeCache.txt ]
+then
 
 # --fresh: re-configure from scratch.
 # This only works for the top-level cmake invocation; does not apply to sub-invocations
 # like builtins or runtimes. For a fresh setup of runtimes or builtins:
-#   rm -rf build-x86_64-unknown-linux-musl/s2-llvm-build/runtimes \
-#          build-x86_64-unknown-linux-musl/s2-llvm-build/projects/runtimes* \
-#          build-x86_64-unknown-linux-musl/s2-llvm-build/projects/builtins*
+#   rm -rf build-x86_64-unknown-linux-musl/llvm-build/runtimes \
+#          build-x86_64-unknown-linux-musl/llvm-build/projects/runtimes* \
+#          build-x86_64-unknown-linux-musl/llvm-build/projects/builtins*
 #
 # EXTRA_CMAKE_ARGS+=( --fresh )
 
@@ -315,7 +327,6 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;WebAssembly" \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]}")" \
-  -DLLVM_DEFAULT_TARGET_TRIPLE=$TARGET_TRIPLE \
   -DLLVM_APPEND_VC_REV=OFF \
   -DLLVM_ENABLE_MODULES=OFF \
   -DLLVM_ENABLE_BINDINGS=OFF \
@@ -342,7 +353,7 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCLANG_INCLUDE_DOCS=OFF \
   -DCLANG_ENABLE_OBJC_REWRITER=OFF \
   -DCLANG_ENABLE_ARCMT=OFF \
-  -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+  -DCLANG_ENABLE_STATIC_ANALYZER=ON \
   -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
   -DCLANG_DEFAULT_RTLIB=compiler-rt \
   -DCLANG_DEFAULT_UNWINDLIB=libunwind \
@@ -384,9 +395,25 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
 
 fi
 
-echo "———————————————————————— build ————————————————————————"
-ninja -j$NCPU distribution "${EXTRA_COMPONENTS[@]}"
 
+# fix an issue with llvm's cmake files trying to alter the RPATH in executables
+# during installation, which will fail with error
+#   "No valid ELF RPATH or RUNPATH entry exists in the file"
+# when linking statically
+if $ENABLE_STATIC_LINKING; then
+  for f in $(find . -name cmake_install.cmake); do
+    sed -E -i '' -e 's/file\(RPATH_CHANGE/message(DEBUG/' $f
+  done
+fi
+
+
+echo "———————————————————————— build ————————————————————————"
+ninja -j$NCPU distribution ${EXTRA_COMPONENTS[@]:-}
+
+
+if [ -n "${PB_LLVM_STOP_AFTER_BUILD:-}" ]; then
+  exit 0
+fi
 
 
 echo "———————————————————————— install ————————————————————————"
@@ -394,20 +421,26 @@ rm -rf "$DESTDIR"
 mkdir -p "$DESTDIR"
 DESTDIR="$DESTDIR" ninja -j$NCPU install-distribution-stripped
 
+# rename clang-VERSION to clang
+rm "$DESTDIR/bin/clang"
+mv "$DESTDIR/bin/clang-${LLVM_VERSION%%.*}" "$DESTDIR/bin/clang"
+
 # no install target for clang-tblgen
 install -vm 0755 bin/clang-tblgen "$DESTDIR/bin/clang-tblgen"
 
-# no install targets for lld libs
-for f in lib/liblld*.a; do
-  install -vm 0644 $f "$DESTDIR/lib/$(basename "$f")"
-done
+if $ENABLE_LLVM_DEV_FILES; then
+  # no install targets for lld libs
+  for f in lib/liblld*.a; do
+    install -vm 0644 $f "$DESTDIR/lib/$(basename "$f")"
+  done
 
-# # copy lld headers from source (they are not affected by build)
-cp -av "$LLVM_STAGE2_SRC/lld/include/lld" "$DESTDIR/include/lld"
+  # copy lld headers from source (they are not affected by build)
+  cp -av "$LLVM_STAGE2_SRC/lld/include/lld" "$DESTDIR/include/lld"
+fi
 
-# bin/ fixes
-_pushd "$DESTDIR"/bin
-
+# # bin/ fixes
+# _pushd "$DESTDIR"/bin
+#
 # # create binutils-compatible symlinks
 # # ack --type=cmake 'add_llvm_tool_symlink\(' build/s2-llvm-17.0.3 | cat
 # BINUTILS_SYMLINKS=( # "alias target"

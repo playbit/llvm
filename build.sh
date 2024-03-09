@@ -15,7 +15,8 @@ MUSL_URL=https://git.musl-libc.org/cgit/musl/snapshot/v$MUSL_VERSION.tar.gz
 MUSL_PATCHDIR=$PWD/patches-musl
 
 WASI_GIT_TAG=wasi-sdk-21
-WASI_GIT_URL=https://github.com/WebAssembly/wasi-libc.git
+WASI_SHA256=4a2a3e3b120ba1163c57f34ac79c3de720a8355ee3a753d81f1f0c58c4cf6017
+WASI_URL=https://github.com/WebAssembly/wasi-libc/archive/refs/tags/$WASI_GIT_TAG.tar.gz
 
 MAC_SDK_VERSION=11.3
 MAC_SDK_SHA256=196e1acde8bf6a8165f5c826531f3c9ce2bd72b0a791649f5b36ff70ff24b824
@@ -53,6 +54,8 @@ HOST_SYS=${HOST_SYS/darwin/macos}
 VERBOSE=false
 PRINT_CONFIG=false
 ENABLE_LTO=false
+REBUILD_LLVM=false
+NO_PACKAGE=false
 
 
 # parse command line arguments
@@ -63,6 +66,8 @@ options:
   --builddir=<dir>  Build in <dir>
   --print-config    Print configuration and exit (don't build anything)
   --lto             Build with LTO
+  --rebuild-llvm    Incrementally (re)build llvm stage 2 even if it's up to date
+  --no-package      Don't create package of final product (useful when debugging)
   -v                Verbose logging
   -h, --help        Show help and exit
 <target>
@@ -73,6 +78,8 @@ _HELP_
   --builddir=*) BUILD_DIR=${1:11}; shift ;;
   --print-config) PRINT_CONFIG=true; shift ;;
   --lto) ENABLE_LTO=true; shift ;;
+  --rebuild-llvm) REBUILD_LLVM=true; shift ;;
+  --no-package) NO_PACKAGE=true; shift ;;
   -v) VERBOSE=true; shift ;;
   -*) _err "unknown option $1 (see $0 -help)" ;;
   *)
@@ -155,7 +162,9 @@ NCPU=$(nproc)
 _run_if_missing() { # <testfile> <script>
   local TESTFILE=$1
   local SCRIPT=$2
-  [ -e "$TESTFILE" ] && return 0
+  if [ -e "$TESTFILE" ] && ! [ $REBUILD_LLVM = true -a $SCRIPT = _llvm-stage2.sh ]; then
+    return 0
+  fi
   echo "——————————————————————————————————————————————————————————————————————"
   ( source $SCRIPT )
   echo "——————————————————————————————————————————————————————————————————————"
@@ -219,9 +228,11 @@ echo "Using llvm source at ${LLVM_STAGE1_SRC##$PWD0/}"
 
 # build llvm stage 1 (for host)
 LLVM_STAGE1_DIR=$BUILD_DIR/s1-llvm
-_run_if_missing "$LLVM_STAGE1_DIR/bin/llvm-tblgen" _llvm-stage1.sh
+_run_if_missing "$LLVM_STAGE1_DIR/bin/clang" _llvm-stage1.sh
 echo "Using llvm-stage1 at ${LLVM_STAGE1_DIR##$PWD0/}/"
 export PATH=$LLVM_STAGE1_DIR/bin:$PATH
+
+HOST_TRIPLE=$($LLVM_STAGE1_DIR/bin/clang -print-target-triple)
 
 # ————————————————————————————————————————————————————————————————————————————
 # stage 2
@@ -234,7 +245,7 @@ else
   export LD=ld.lld
 fi
 
-SYSROOT=$BUILD_DIR_S2/sysroot
+SYSROOT=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE
 STAGE2_CFLAGS=(
   --target=$TARGET_TRIPLE \
   --sysroot=$SYSROOT \
@@ -280,6 +291,8 @@ export LDFLAGS=${STAGE2_LDFLAGS[@]}
 BUILD_DIR=$BUILD_DIR_S2
 mkdir -p "$BUILD_DIR"
 
+S1_CLANGRES_DIR=$(realpath $($LLVM_STAGE1_DIR/bin/clang --print-runtime-dir)/../..)
+
 if $VERBOSE || $PRINT_CONFIG; then
   cat << EOF
 Stage 3 environment variables:
@@ -302,16 +315,31 @@ Stage 3 environment variables:
 EOF
 fi
 
-# sysroot
-case "$TARGET_SYS" in
-linux)
-  _run_if_missing "$SYSROOT/usr/include/linux/version.h" _sysroot-linux.sh
-  _run_if_missing "$SYSROOT/usr/include/stdlib.h" _sysroot-musl.sh
-  ;;
-wasi)
-  _run_if_missing "$SYSROOT/usr/include/stdlib.h" _sysroot-wasi.sh
-  ;;
-esac
+# —————————————————————————————————————————————————————————————————————————————
+# step 1: for every TARGET_TRIPLE, build its sysroot, consisting of:
+# - compiler builtins (e.g. lib/linux/libclang_rt.builtins-aarch64.a)
+# - libc
+# - libc++ & libc++abi
+# - libunwind
+#
+
+# build sysroots
+_build_sysroot() {
+  case "$TARGET_TRIPLE" in
+  *-linux*)
+    _run_if_missing "$SYSROOT/include/linux/version.h" _linux-headers.sh
+    _run_if_missing "$SYSROOT/include/stdlib.h" _musl.sh
+    ;;
+  *-wasi*)
+    _run_if_missing "$SYSROOT/include/stdlib.h" _wasi.sh
+    ;;
+  esac
+}
+for TARGET_TRIPLE2 in ${TARGET_TRIPLES[@]}; do
+  TARGET_TRIPLE=$TARGET_TRIPLE2 \
+  SYSROOT=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE2 \
+  _build_sysroot
+done
 echo "Using sysroot at ${SYSROOT##$PWD0/}/"
 
 # setup llvm source
@@ -325,70 +353,73 @@ LLVM_STAGE2_SRC=$BUILD_DIR_GENERIC/s2-llvm-$LLVM_VERSION
 _run_if_missing "$LLVM_STAGE2_SRC/LICENSE.TXT" _llvm-stage2-source.sh
 echo "Using llvm source at ${LLVM_STAGE1_SRC##$PWD0/}"
 
-# build builtins.a
-BUILTINS_DIR=$BUILD_DIR/s2-builtins
-_run_if_missing "$BUILTINS_DIR/builtins.a" _llvm-builtins.sh
+# build compiler builtins
+BUILTINS_DIR=$BUILD_DIR/builtins
+_run_if_missing "$BUILTINS_DIR/lib/$TARGET_TRIPLE/libclang_rt.builtins.a" _builtins.sh
 echo "Using builtins.a at ${BUILTINS_DIR##$PWD0/}/"
+
+# build libunwind, libc++ and libc++abi
+LIBCXX_DIR=$BUILD_DIR/libcxx
+_run_if_missing "$LIBCXX_DIR/lib-$TARGET_TRIPLE/libc++.a" _libcxx.sh
+echo "Using libc++.a at ${LIBCXX_DIR##$PWD0/}/lib-$TARGET_TRIPLE/"
+
+# —————————————————————————————————————————————————————————————————————————————
+# step 2: build llvm for primary target
+
 CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR/"
 LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR/"
-
-# build libcxx (libc++.a, libc++abi.a, libunwind.a)
-LIBCXX_DIR=$BUILD_DIR/s2-libcxx
-_run_if_missing "$LIBCXX_DIR/lib/libc++.a" _llvm-libcxx.sh
-echo "Using libc++.a & libunwind.a at ${LIBCXX_DIR##$PWD0/}/"
-CFLAGS="$CFLAGS -isystem$LIBCXX_DIR/usr/include"
-LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib"
-
-# must explicitly specify search path for "clang headers"
-# or else zstd will fail to build, not finding emmintrin.h.
-S1_CLANGRES_DIR=$(realpath $($LLVM_STAGE1_DIR/bin/clang --print-runtime-dir)/../..)
+CFLAGS="$CFLAGS -I$LIBCXX_DIR/include/c++/v1 -I$LIBCXX_DIR/include"
+LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib-$TARGET_TRIPLE"
 CFLAGS="$CFLAGS -isystem$S1_CLANGRES_DIR/include"
 
 # build zlib
-ZLIB_DIR=$BUILD_DIR/s2-zlib-$ZLIB_VERSION
+ZLIB_DIR=$BUILD_DIR/zlib
 _run_if_missing "$ZLIB_DIR/lib/libz.a" _zlib.sh
 echo "Using libz.a at ${ZLIB_DIR##$PWD0/}/"
 
 # build zstd
-ZSTD_DIR=$BUILD_DIR/s2-zstd-$ZSTD_VERSION
+ZSTD_DIR=$BUILD_DIR/zstd
 _run_if_missing "$ZSTD_DIR/lib/libzstd.a" _zstd.sh
 echo "Using libzstd.a at ${ZSTD_DIR##$PWD0/}/"
 
 # build libxml2
-LIBXML2_DIR=$BUILD_DIR/s2-libxml2-$LIBXML2_VERSION
+LIBXML2_DIR=$BUILD_DIR/libxml2
 _run_if_missing "$LIBXML2_DIR/lib/libxml2.a" _libxml2.sh
 echo "Using libxml2.a at ${LIBXML2_DIR##$PWD0/}/"
 
 # build llvm stage 2 (for target, not host)
-LLVM_STAGE2_DIR=$BUILD_DIR/s2-llvm
+LLVM_STAGE2_DIR=$BUILD_DIR/llvm
 _run_if_missing "$LLVM_STAGE2_DIR/bin/clang" _llvm-stage2.sh
 echo "Using llvm-stage2 at ${LLVM_STAGE2_DIR##$PWD0/}/"
+[ -n "${PB_LLVM_STOP_AFTER_BUILD:-}" ] && exit 0
 
-# build compiler-rt
-COMPILER_RT_DIR=$BUILD_DIR/s2-compiler-rt
-_run_if_missing \
-  "$COMPILER_RT_DIR/lib/linux/$TARGET_TRIPLE/libclang_rt.asan.a" \
-  _llvm-compiler-rt.sh
+# build compiler-rt for every TARGET_TRIPLE
+# COMPILER_RT_DIR=$BUILD_DIR/compiler-rt-$TARGET_TRIPLE
+# _run_if_missing "$COMPILER_RT_DIR/xxx" _compiler-rt.sh
+#
+# ( TARGET_TRIPLE=aarch64-unknown-linux-musl
+#   COMPILER_RT_DIR=$BUILD_DIR/compiler-rt-$TARGET_TRIPLE
+#   SYSROOT=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE
+#   _run_if_missing "$COMPILER_RT_DIR/xxx" _compiler-rt.sh
+# )
+#
+COMPILER_RT_DIR=$BUILD_DIR/compiler-rt
+for TARGET_TRIPLE2 in ${TARGET_TRIPLES[@]}; do
+  # only builtins for wasm (built earliear), no sanitizers et al
+  [[ $TARGET_TRIPLE2 == wasm* ]] && continue
+  TARGET_TRIPLE=$TARGET_TRIPLE2 \
+  SYSROOT=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE2 \
+  _run_if_missing \
+    "$COMPILER_RT_DIR/lib/$TARGET_TRIPLE2/libclang_rt.asan.a" \
+    _compiler-rt.sh
+done
 echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/"
 
-exit
+# ——————————————————————————————————————————————————————————————————————————————
+# step 3: package
 
-# # build llvm runtimes
-# LLVM_RUNTIMES_DIR=$BUILD_DIR/llvm-runtimes
-# _run_if_missing "$LLVM_RUNTIMES_DIR/lib/libx.a" _llvm-runtimes.sh
-# echo "Using llvm-runtimes at ${LLVM_RUNTIMES_DIR##$PWD0/}/"
-# exit
-
-
-# build llvm
-LLVM_DIR=$BUILD_DIR/llvm-stage1
-source _llvm-stage1.sh
-
-exit 0
-
-
-
-# build llvm
-LLVM_DIR=$BUILD_DIR/llvm-stage2
-source _llvm-build.sh
-
+if ! $NO_PACKAGE; then
+  PACKAGE_DIR=$BUILD_DIR/package
+  PACKAGE_ARCHIVE=$BUILD_DIR/playbit-sdk-$TARGET_ARCH.tar.xz
+  _run_if_missing "$PACKAGE_DIR/xxx" _package.sh
+fi

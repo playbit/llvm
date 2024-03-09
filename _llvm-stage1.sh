@@ -61,8 +61,8 @@ esac
 CMAKE_C_FLAGS="${CFLAGS:-} ${CMAKE_C_FLAGS[@]:-}"
 CMAKE_LD_FLAGS="${LDFLAGS:-} ${CMAKE_LD_FLAGS[@]:-}"
 
-mkdir -p "$LLVM_STAGE1_DIR-build"
-_pushd "$LLVM_STAGE1_DIR-build"
+mkdir -p "$LLVM_STAGE1_DIR/build"
+_pushd "$LLVM_STAGE1_DIR/build"
 
 cmake -G Ninja -Wno-dev "$LLVM_STAGE1_SRC/llvm" \
   -DCMAKE_BUILD_TYPE=Release \
@@ -82,7 +82,7 @@ cmake -G Ninja -Wno-dev "$LLVM_STAGE1_SRC/llvm" \
   -DCMAKE_SHARED_LINKER_FLAGS="$CMAKE_LD_FLAGS" \
   -DCMAKE_MODULE_LINKER_FLAGS="$CMAKE_LD_FLAGS" \
   \
-  -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+  -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly" \
   -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt" \
   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]:-}")" \
@@ -171,9 +171,6 @@ ninja -j$NCPU \
   llvm-headers \
   clang-tblgen \
   cxxabi
-
-rm -rf "$LLVM_STAGE1_DIR"
-mkdir -p "$LLVM_STAGE1_DIR"
 
 ninja -j$NCPU \
   install-distribution-stripped \
