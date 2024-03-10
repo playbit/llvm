@@ -28,6 +28,7 @@ _cpmerge $COMPILER_RT_DIR/bin bin  # hwasan_symbolize
 _cpmerge $BUILTINS_DIR/lib lib/clang/lib
 _cpmerge $COMPILER_RT_DIR/lib lib/clang/lib
 
+
 _cpmerge $LIBCXX_DIR/include/c++ sysroot-generic/include/c++
 
 # TARGET_TRIPLES=( x86_64-unknown-linux-musl ) # xxx
@@ -35,6 +36,8 @@ _cpmerge $LIBCXX_DIR/include/c++ sysroot-generic/include/c++
 for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
   IFS=- read -r TARGET_ARCH ign <<< "$TARGET_TRIPLE"
   TARGET_SYSROOT=sysroot-$TARGET_ARCH
+
+  mv lib/clang/lib/$TARGET_TRIPLE lib/clang/lib/$TARGET_ARCH-playbit
 
   _cpmerge $BUILD_DIR_S2/sysroot-$TARGET_TRIPLE $TARGET_SYSROOT
 
@@ -47,13 +50,13 @@ for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
     mv $TARGET_SYSROOT/lib/libc*.so $TARGET_SYSROOT/lib/libc.so
   fi
 
-  # TEMPORARY HACK -- remove when we have proper clang driver
-  touch $TARGET_SYSROOT/lib/crtbegin.o
-  touch $TARGET_SYSROOT/lib/crtend.o
-  touch $TARGET_SYSROOT/lib/crtbeginS.o
-  touch $TARGET_SYSROOT/lib/crtendS.o
-  touch $TARGET_SYSROOT/lib/crtbeginT.o
-  touch $TARGET_SYSROOT/lib/crtendT.o
+  # # TEMPORARY HACK -- remove when we have proper clang driver
+  # touch $TARGET_SYSROOT/lib/crtbegin.o
+  # touch $TARGET_SYSROOT/lib/crtend.o
+  # touch $TARGET_SYSROOT/lib/crtbeginS.o
+  # touch $TARGET_SYSROOT/lib/crtendS.o
+  # touch $TARGET_SYSROOT/lib/crtbeginT.o
+  # touch $TARGET_SYSROOT/lib/crtendT.o
 done
 
 # remove empty directories
