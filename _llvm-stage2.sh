@@ -78,9 +78,8 @@ CMAKE_LD_FLAGS+=( -static )
 # Note that if sysroot is relative, clang will treat it as relative to itself.
 # I.e. sysroot=foo with clang at /bin/clang results in sysroot=/bin/foo.
 # See line ~200 of clang/lib/Driver/Driver.cpp
-TARGET_ARCH=${TARGET_TRIPLE%%-*}
 EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="" )
-# EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="../sysroot-$TARGET_ARCH/" )
+# EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="../sysroot-${TARGET_TRIPLE%%-*}/" )
 #
 # C_INCLUDE_DIRS is a colon-separated list of paths to search by default.
 # Relative paths are relative to sysroot.
@@ -99,7 +98,7 @@ EXTRA_CMAKE_ARGS+=( -DENABLE_LINKER_BUILD_ID=ON )
 EXTRA_CMAKE_ARGS+=( -DGENERATOR_IS_MULTI_CONFIG=ON )
 
 # LLVM_INSTALL_BINUTILS_SYMLINKS create symlinks that match binutils (nm ar etc)
-EXTRA_CMAKE_ARGS+=( -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON )
+#EXTRA_CMAKE_ARGS+=( -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON )
 
 # LLVM_INSTALL_TOOLCHAIN_ONLY: Only include toolchain files in the 'install' target
 # EXTRA_CMAKE_ARGS+=( -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON )
@@ -107,160 +106,18 @@ EXTRA_CMAKE_ARGS+=( -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON )
 # CLANG_RESOURCE_DIR: /lib/clang/VERSION by default
 EXTRA_CMAKE_ARGS+=( -DCLANG_RESOURCE_DIR=../lib/clang )
 
-
-ENABLE_BUILTINS=false
-if $ENABLE_BUILTINS; then
-  # TODO: build all sysroots, then enable runtimes for all targets
-  TARGET_TRIPLES=( $TARGET_TRIPLE ) # XXX FIXME
-  EXTRA_CMAKE_ARGS+=(
-    -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
-    -DLLVM_BUILTIN_TARGETS="$(_array_join ";" ${TARGET_TRIPLES[@]})" \
-    -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
-  )
-  DIST_COMPONENTS+=( builtins )
-  RUNTIMES_INSTALL_RPATH="\$ORIGIN/../lib;/lib"
-  # BUILTINS_CFLAGS=( -fPIC -resource-dir=$BUILTINS_DIR/ -isystem$LIBCXX_DIR/include )
-  BUILTINS_CFLAGS=( -fPIC )
-  OUTER_TARGET_TRIPLE=$TARGET_TRIPLE
-  for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-    EXTRA_CMAKE_ARGS+=(
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_BUILD_TYPE=MinSizeRel \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_SYSTEM_NAME=Linux \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_SYSROOT="$SYSROOT" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_INSTALL_RPATH=$RUNTIMES_INSTALL_RPATH \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-      \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_ASM_COMPILER="$CC" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_C_COMPILER="$CC" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_CXX_COMPILER="$CXX" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_AR="$AR" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_RANLIB="$RANLIB" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_LINKER="$LD" \
-      \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_C_FLAGS="${BUILTINS_CFLAGS[@]:-} --target=${TARGET_TRIPLE}" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_CXX_FLAGS="${BUILTINS_CFLAGS[@]:-} --target=${TARGET_TRIPLE}" \
-      -DBUILTINS_${TARGET_TRIPLE}_CMAKE_ASM_FLAGS="${BUILTINS_CFLAGS[@]:-} --target=${TARGET_TRIPLE}" \
-      \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_BUILTINS=ON \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_SANITIZERS=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_XRAY=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_LIBFUZZER=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_PROFILE=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_CRT=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_ORC=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_INCLUDE_TESTS=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_CAN_EXECUTE_TESTS=OFF \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_USE_BUILTINS_LIBRARY=ON  \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_BUILD_STANDALONE_LIBATOMIC=OFF \
-    )
-    # EXTRA_CMAKE_ARGS+=(
-    #   -DBUILTINS_${TARGET_TRIPLE}_CMAKE_ASM_COMPILER_ID=Clang \
-    #   -DBUILTINS_${TARGET_TRIPLE}_CMAKE_C_COMPILER_ID=Clang \
-    #   -DBUILTINS_${TARGET_TRIPLE}_CMAKE_CXX_COMPILER_ID=Clang \
-    # )
-    # EXTRA_CMAKE_ARGS+=(
-    #   -DBUILTINS_${TARGET_TRIPLE}_CMAKE_ASM_COMPILER_VERSION=$LLVM_VERSION \
-    #   -DBUILTINS_${TARGET_TRIPLE}_CMAKE_C_COMPILER_VERSION=$LLVM_VERSION \
-    #   -DBUILTINS_${TARGET_TRIPLE}_CMAKE_CXX_COMPILER_VERSION=$LLVM_VERSION \
-    # )
-    EXTRA_CMAKE_ARGS+=(
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_CXX_LIBRARY=libcxx \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_USE_LLVM_UNWINDER=ON \
-      -DBUILTINS_${TARGET_TRIPLE}_COMPILER_RT_ENABLE_STATIC_UNWINDER=ON \
-    )
-  done
-  TARGET_TRIPLE=$OUTER_TARGET_TRIPLE
+if $ENABLE_LTO; then
+  EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_LTO=Thin )
 fi
-
-ENABLE_RUNTIMES=false
-if $ENABLE_RUNTIMES; then
-  LLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind"
-  # LLVM_ENABLE_RUNTIMES="compiler-rt"
-  DIST_COMPONENTS+=( runtimes )
-  EXTRA_CMAKE_ARGS+=(
-    -DLLVM_RUNTIME_TARGETS="$(_array_join ";" ${TARGET_TRIPLES[@]})" \
-    -DLLVM_ENABLE_RUNTIMES="$LLVM_ENABLE_RUNTIMES" \
-  )
-  RUNTIMES_CFLAGS=( -fPIC )
-  # if $ENABLE_BUILTINS; then
-  #   RUNTIMES_CFLAGS+=( -resource-dir=$BUILTINS_DIR/ )
-  # fi
-  OUTER_TARGET_TRIPLE=$TARGET_TRIPLE
-  for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-    EXTRA_CMAKE_ARGS+=(
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_BUILD_TYPE=MinSizeRel \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_SYSTEM_NAME=Linux \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_SYSROOT="$SYSROOT" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_INSTALL_RPATH="$RUNTIMES_INSTALL_RPATH" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_ASM_COMPILER="$CC" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_C_COMPILER="$CC" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_CXX_COMPILER="$CXX" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_AR="$AR" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_RANLIB="$RANLIB" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_LINKER="$LD" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_NM="$LLVM_STAGE1_DIR/bin/llvm-nm" \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_C_FLAGS="${RUNTIMES_CFLAGS[@]:-} --target=${TARGET_TRIPLE}" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_CXX_FLAGS="${RUNTIMES_CFLAGS[@]:-} --target=${TARGET_TRIPLE}" \
-      -DRUNTIMES_${TARGET_TRIPLE}_CMAKE_ASM_FLAGS="${RUNTIMES_CFLAGS[@]:-} --target=${TARGET_TRIPLE}" \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_LLVM_ENABLE_RUNTIMES="$LLVM_ENABLE_RUNTIMES" \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_BUILTINS=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_SANITIZERS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_XRAY=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_LIBFUZZER=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_PROFILE=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_CRT=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_ORC=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_INCLUDE_TESTS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_CAN_EXECUTE_TESTS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_USE_BUILTINS_LIBRARY=ON  \
-      -DRUNTIMES_${TARGET_TRIPLE}_COMPILER_RT_BUILD_STANDALONE_LIBATOMIC=OFF \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBUNWIND_USE_COMPILER_RT=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBUNWIND_ENABLE_SHARED=OFF \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_ENABLE_SHARED=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_USE_LLVM_UNWINDER=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_ENABLE_STATIC_UNWINDER=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_USE_COMPILER_RT=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_INCLUDE_TESTS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXXABI_LINK_TESTS_WITH_SHARED_LIBCXXABI=OFF \
-      \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_HAS_MUSL_LIBC=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_USE_COMPILER_RT=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_ENABLE_STATIC=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_ENABLE_SHARED=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_ABI_VERSION=2 \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_CXX_ABI=libcxxabi \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=ON \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_INCLUDE_TESTS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_INCLUDE_BENCHMARKS=OFF \
-      -DRUNTIMES_${TARGET_TRIPLE}_LIBCXX_LINK_TESTS_WITH_SHARED_LIBCXX=OFF \
-    )
-  done
-  TARGET_TRIPLE=$OUTER_TARGET_TRIPLE
-fi
-
-
-# EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_LTO=Thin )
 
 if [ "$CBUILD" != "$CHOST" ]; then
   case "$HOST_SYS" in
     linux) EXTRA_CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Linux ) ;;
     macos) EXTRA_CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Darwin ) ;;
   esac
-  case "$TARGET_SYS" in
-    linux) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Linux ) ;;
-    macos) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Darwin ) ;;
+  case "$TARGET_TRIPLE" in
+    *linux*) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Linux ) ;;
+    *macos*) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Darwin ) ;;
   esac
 fi
 
@@ -275,7 +132,7 @@ EXTRA_CMAKE_ARGS+=(
 )
 
 # EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=$TARGET_TRIPLE )
-EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=$TARGET_ARCH-unknown-playbit )
+EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE%%-*}-unknown-playbit )
 
 # EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER=lld )
 EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER= )
@@ -283,7 +140,49 @@ EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER= )
 CMAKE_LD_FLAGS+=( -L"$SYSROOT/lib" )
 # CMAKE_LD_FLAGS+=( -L"$LIBCXX_STAGE2/lib" )
 
-# TODO -DCMAKE_ASM_COMPILER="$AS"
+# LLVM_ENABLE_ASSERTIONS: Enable assertions (default: ON in Debug mode, else OFF)
+#EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_ASSERTIONS=ON )
+
+# LLVM_ENABLE_BACKTRACES: Enable embedding backtraces on crash. (default: ON)
+#EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_BACKTRACES=OFF )
+
+# LLVM_INCLUDE_DOCS: Generate build targets for llvm documentation. (default: ON)
+# Note: CLANG_INCLUDE_DOCS defaults to LLVM_INCLUDE_DOCS
+EXTRA_CMAKE_ARGS+=( -DLLVM_INCLUDE_DOCS=OFF )
+
+EXTRA_CMAKE_ARGS+=( -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON )
+
+case "$TARGET_TRIPLE" in
+  # aarch64*)
+  #   CMAKE_C_FLAGS+=( -mcpu=apple-m1 )
+  #   ;;
+  x86_64*)
+    # -march=x86-64    CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
+    # -march=x86-64-v2 (close to Nehalem, ~2008) CMPXCHG16B, LAHF-SAHF, POPCNT,
+    #                  SSE3, SSE4.1, SSE4.2, SSSE3
+    # -march=x86-64-v3 (close to Haswell ~2013) AVX, AVX2, BMI1, BMI2, F16C, FMA,
+    #                  LZCNT, MOVBE, XSAVE
+    # -march=x86-64-v4 AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
+    CMAKE_C_FLAGS+=( -march=x86-64-v2 )
+    ;;
+esac
+
+LLVM_TARGETS_TO_BUILD=()
+TARGET_TRIPLES_STR=${TARGET_TRIPLES[*]}
+[[ "$TARGET_TRIPLES_STR" == *x86* ]] && LLVM_TARGETS_TO_BUILD+=( X86 )
+[[ "$TARGET_TRIPLES_STR" == *aarch64* ]] && LLVM_TARGETS_TO_BUILD+=( AArch64 )
+[[ "$TARGET_TRIPLES_STR" == *riscv* ]] && LLVM_TARGETS_TO_BUILD+=( RISCV )
+[[ "$TARGET_TRIPLES_STR" == *wasm* ]] && LLVM_TARGETS_TO_BUILD+=( WebAssembly )
+
+EXTRA_CMAKE_ARGS+=( -DLLDB_ENABLE_PYTHON=OFF )
+# EXTRA_CMAKE_ARGS+=(
+#   -DLLDB_ENABLE_CURSES=OFF \
+#   -DLLDB_ENABLE_FBSDVMCORE=OFF \
+#   -DLLDB_ENABLE_LIBEDIT=OFF \
+#   -DLLDB_ENABLE_LUA=OFF \
+#   -DLLDB_INCLUDE_TESTS=OFF \
+#   -DLLDB_TABLEGEN_EXE="$LLVM_STAGE1_DIR/bin/lldb-tblgen" \
+# )
 
 # bake flags (array -> string)
 CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS[@]:-} ${CMAKE_C_FLAGS[@]:-}"
@@ -299,7 +198,7 @@ if [ -z "${PB_LLVM_SKIP_CONFIG:-}" ] &&
    [ ! -f CMakeCache.txt -o "$SELF_SCRIPT" -nt CMakeCache.txt ]
 then
 
-# --fresh: re-configure from scratch.
+# [hacking] --fresh: re-configure from scratch.
 # This only works for the top-level cmake invocation; does not apply to sub-invocations
 # like builtins or runtimes. For a fresh setup of runtimes or builtins:
 #   rm -rf build-x86_64-unknown-linux-musl/llvm-build/runtimes \
@@ -307,9 +206,6 @@ then
 #          build-x86_64-unknown-linux-musl/llvm-build/projects/builtins*
 #
 # EXTRA_CMAKE_ARGS+=( --fresh )
-
-# EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_ASSERTIONS=OFF -DLLVM_ENABLE_BACKTRACES=OFF )
-EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_BACKTRACES=ON )
 
 cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
@@ -331,31 +227,26 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   \
   -DCMAKE_SYSROOT="$SYSROOT" \
   \
-  -DLLVM_TARGETS_TO_BUILD="X86;AArch64;RISCV;WebAssembly" \
+  -DLLVM_TARGETS_TO_BUILD="$(_array_join ";" "${LLVM_TARGETS_TO_BUILD[@]}")" \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]}")" \
   -DLLVM_APPEND_VC_REV=OFF \
-  -DLLVM_ENABLE_MODULES=OFF \
-  -DLLVM_ENABLE_BINDINGS=OFF \
-  -DLLVM_ENABLE_TERMINFO=OFF \
-  -DLLVM_ENABLE_LIBEDIT=OFF \
-  -DLLVM_ENABLE_EH=OFF \
-  -DLLVM_ENABLE_RTTI=OFF \
-  -DLLVM_ENABLE_FFI=OFF \
-  -DLLDB_ENABLE_PYTHON=OFF \
-  -DLLVM_INCLUDE_UTILS=OFF \
+  -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_UTILS=OFF \
   -DLLVM_INCLUDE_TESTS=OFF \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_BENCHMARKS=OFF \
+  -DLLVM_INCLUDE_TOOLS=ON \
+  -DLLVM_ENABLE_BINDINGS=OFF \
+  -DLLVM_ENABLE_TERMINFO=OFF \
+  -DLLVM_ENABLE_LIBEDIT=OFF \
+  -DLLVM_ENABLE_FFI=OFF \
+  -DLLDB_ENABLE_PYTHON=OFF \
   -DLLVM_ENABLE_OCAMLDOC=OFF \
   -DLLVM_ENABLE_Z3_SOLVER=OFF \
-  -DLLVM_INCLUDE_DOCS=OFF \
+  -DLLVM_ENABLE_PIC=OFF \
   -DLLVM_BUILD_LLVM_DYLIB=OFF \
   -DLLVM_BUILD_LLVM_C_DYLIB=OFF \
-  -DLLVM_ENABLE_PIC=OFF \
-  -DLLVM_INCLUDE_TOOLS=ON \
   \
-  -DCLANG_INCLUDE_DOCS=OFF \
   -DCLANG_ENABLE_OBJC_REWRITER=OFF \
   -DCLANG_ENABLE_ARCMT=OFF \
   -DCLANG_ENABLE_STATIC_ANALYZER=ON \
@@ -366,14 +257,6 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCLANG_PLUGIN_SUPPORT=OFF \
   -DCLANG_VENDOR=Playbit \
   -DLIBCLANG_BUILD_STATIC=ON \
-  \
-  -DLLDB_ENABLE_CURSES=OFF \
-  -DLLDB_ENABLE_FBSDVMCORE=OFF \
-  -DLLDB_ENABLE_LIBEDIT=OFF \
-  -DLLDB_ENABLE_LUA=OFF \
-  -DLLDB_ENABLE_PYTHON=OFF \
-  -DLLDB_INCLUDE_TESTS=OFF \
-  -DLLDB_TABLEGEN_EXE="$LLVM_STAGE1_DIR/bin/lldb-tblgen" \
   \
   -DLLVM_TABLEGEN="$LLVM_STAGE1_DIR/bin/llvm-tblgen" \
   -DCLANG_TABLEGEN="$LLVM_STAGE1_DIR/bin/clang-tblgen" \
@@ -442,37 +325,36 @@ if $ENABLE_LLVM_DEV_FILES; then
   cp -av "$LLVM_STAGE2_SRC/lld/include/lld" "$DESTDIR/include/lld"
 fi
 
-# # bin/ fixes
-# _pushd "$DESTDIR"/bin
-#
-# # create binutils-compatible symlinks
-# # ack --type=cmake 'add_llvm_tool_symlink\(' build/s2-llvm-17.0.3 | cat
-# BINUTILS_SYMLINKS=( # "alias target"
-#   addr2line         llvm-symbolizer \
-#   ar                llvm-ar \
-#   bitcode_strip     llvm-bitcode-strip \
-#   c++filt           llvm-cxxfilt \
-#   debuginfod        llvm-debuginfod \
-#   debuginfod-find   llvm-debuginfod-find \
-#   dlltool           llvm-ar \
-#   dwp               llvm-dwp \
-#   install_name_tool llvm-install-name-tool \
-#   libtool           llvm-libtool-darwin \
-#   lipo              llvm-lipo \
-#   nm                llvm-nm \
-#   objcopy           llvm-objcopy \
-#   objdump           llvm-objdump \
-#   otool             llvm-objdump \
-#   ranlib            llvm-ar \
-#   readelf           llvm-readobj \
-#   size              llvm-size \
-#   strings           llvm-strings \
-#   strip             llvm-objcopy \
-#   windres           llvm-rc \
-# )
-# for ((i = 0; i < ${#BINUTILS_SYMLINKS[@]}; i += 2)); do
-#   name=${BINUTILS_SYMLINKS[i]}
-#   target=${BINUTILS_SYMLINKS[$(( i+1 ))]}
-#   [ -e $target ] || continue
-#   _symlink $name $target
-# done
+# create binutils-compatible symlinks
+#   ack --type=cmake 'add_llvm_tool_symlink\(' build/s2-llvm-17.0.3 | cat
+BINUTILS_SYMLINKS=( # "alias target"
+  addr2line         llvm-symbolizer \
+  ar                llvm-ar \
+  bitcode_strip     llvm-bitcode-strip \
+  c++filt           llvm-cxxfilt \
+  debuginfod        llvm-debuginfod \
+  debuginfod-find   llvm-debuginfod-find \
+  dlltool           llvm-ar \
+  dwp               llvm-dwp \
+  install_name_tool llvm-install-name-tool \
+  libtool           llvm-libtool-darwin \
+  lipo              llvm-lipo \
+  nm                llvm-nm \
+  objcopy           llvm-objcopy \
+  objdump           llvm-objdump \
+  otool             llvm-objdump \
+  ranlib            llvm-ar \
+  readelf           llvm-readobj \
+  size              llvm-size \
+  strings           llvm-strings \
+  strip             llvm-objcopy \
+  windres           llvm-rc \
+)
+_pushd "$DESTDIR/bin"
+for ((i = 0; i < ${#BINUTILS_SYMLINKS[@]}; i += 2)); do
+  name=${BINUTILS_SYMLINKS[i]}
+  target=${BINUTILS_SYMLINKS[$(( i+1 ))]}
+  [ -e $target ] || continue
+  _symlink $name $target
+done
+_popd

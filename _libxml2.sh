@@ -7,12 +7,13 @@ rm -f test/icu_parse_test.xml  # no icu
   --prefix= \
   --host=$CHOST \
   --build=$CBUILD \
-  \
+  --with-sysroot=$SYSROOT \
+  --with-pic \
   --enable-static \
   --with-zlib="$ZLIB_DIR" \
-  \
   --disable-shared \
   --disable-dependency-tracking \
+  --disable-maintainer-mode \
   --without-catalog \
   --without-debug \
   --without-ftp \
@@ -51,4 +52,4 @@ rm -f "$LIBXML2_DIR/lib/libxml2.la"
 # rm -rf "$LIBXML2_DIR/lib/pkgconfig"
 
 _popd
-rm -rf "$LIBXML2_DIR/build"
+$NO_CLEANUP || rm -rf "$LIBXML2_DIR/build"

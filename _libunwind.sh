@@ -76,6 +76,7 @@ done
 
 # build
 for TARGET_TRIPLE in ${TARGET_TRIPLES_TO_BUILD[@]}; do
+  NINJA_STATUS="[libunwind-$TARGET_TRIPLE.a %f/%t] " \
   ninja -f build-$TARGET_TRIPLE.ninja
 done
 

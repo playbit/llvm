@@ -12,4 +12,4 @@ CFLAGS="$CFLAGS -O2 -Wno-macro-redefined" \
 make -j$NCPU DESTDIR="$ZLIB_DIR" install
 
 _popd
-rm -rf "$ZLIB_DIR/build"
+$NO_CLEANUP || rm -rf "$ZLIB_DIR/build"

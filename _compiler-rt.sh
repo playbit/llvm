@@ -113,7 +113,5 @@ cmake -G Ninja -S "$LLVM_STAGE2_SRC/compiler-rt" -B "$BUILDDIR" \
   ${CMAKE_ARGS[@]:-}
 
 ninja -C "$BUILDDIR" compiler-rt
-# ninja -C "$BUILDDIR" builtins
-
 ninja -C "$BUILDDIR" install
-# rm -rf "$BUILDDIR"
+$NO_CLEANUP || rm -rf "$BUILDDIR"

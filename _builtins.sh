@@ -538,4 +538,4 @@ for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
 done
 
 _popd
-rm -rf "$BUILDDIR"
+$NO_CLEANUP || rm -rf "$BUILDDIR"

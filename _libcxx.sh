@@ -217,6 +217,7 @@ for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
   CXXFLAGS="$CXXFLAGS -isystem$S1_CLANGRES_DIR/include"
   CXXFLAGS="$CXXFLAGS ${GENERIC_CFLAGS[@]}"
   CFLAGS="$CFLAGS ${GENERIC_CFLAGS[@]}"
+  # note: don't build with LTO, even when ENABLE_LTO=true
 
   LIBUNWIND_CFLAGS=${GENERIC_LIBUNWIND_CFLAGS[@]}
   LIBCXXABI_CFLAGS=${GENERIC_LIBCXXABI_CFLAGS[@]}
@@ -278,7 +279,7 @@ done
 for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
   libs=( libc++abi-$TARGET_TRIPLE.a libc++-$TARGET_TRIPLE.a )
   [[ $TARGET_TRIPLE != wasm* ]] && libs+=( libunwind-$TARGET_TRIPLE.a )
-  NINJA_STATUS="[$TARGET_TRIPLE %f/%t] " \
+  NINJA_STATUS="[libc++ $TARGET_TRIPLE %f/%t] " \
   ninja -f build-$TARGET_TRIPLE.ninja ${libs[@]}
 done
 
@@ -311,4 +312,4 @@ done
 find "$DESTDIR/include" \( -name '.*' -o -name '*.txt' -o -name '*.in' \) -delete
 
 cd "$DESTDIR"
-# rm -rf "$BUILDDIR"
+$NO_CLEANUP || rm -rf "$BUILDDIR"

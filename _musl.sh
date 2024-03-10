@@ -1,4 +1,4 @@
-MUSL_BUILD_DIR=$BUILD_DIR/s2-musl-$MUSL_VERSION
+MUSL_BUILD_DIR=$BUILD_DIR/musl-$MUSL_VERSION
 
 _download_and_extract_tar \
   "$MUSL_URL" "$MUSL_BUILD_DIR" "$MUSL_SHA256" \
@@ -12,20 +12,20 @@ done
 
 ENABLE_EXECINFO=true
 
-_CFLAGS=(
-  --target=$TARGET_TRIPLE \
-  --sysroot=$SYSROOT \
-  -isystem$LLVM_STAGE1_DIR/include \
-  -fPIC \
-)
-_LDFLAGS=(
-  --target=$TARGET_TRIPLE \
-  --sysroot=$SYSROOT \
-  --rtlib=compiler-rt \
-  --ld-path=$LLVM_STAGE1_DIR/bin/$LD \
-)
-export CFLAGS="${_CFLAGS[@]}"
-export LDFLAGS="${_LDFLAGS[@]}"
+# _CFLAGS=(
+#   --target=$TARGET_TRIPLE \
+#   --sysroot=$SYSROOT \
+#   -isystem$LLVM_STAGE1_DIR/include \
+#   -fPIC \
+# )
+# _LDFLAGS=(
+#   --target=$TARGET_TRIPLE \
+#   --sysroot=$SYSROOT \
+#   --rtlib=compiler-rt \
+#   --ld-path=$LLVM_STAGE1_DIR/bin/ld.lld \
+# )
+# export CFLAGS="${CFLAGS:-} --target=$TARGET_TRIPLE --sysroot=$SYSROOT"
+# export LDFLAGS="${_LDFLAGS[@]}"
 
 ./configure \
   --target=$TARGET_TRIPLE \
@@ -81,7 +81,6 @@ rm -f "$SYSROOT/lib/libssp_nonshared.a"
 ar r "$SYSROOT/lib/libssp_nonshared.a" /tmp/__stack_chk_fail_local.o
 
 _popd
-#rm -rf "$MUSL_BUILD_DIR"
 
 # fix dynamic linker symlink
 rm "$SYSROOT"/lib/ld-musl-*.so.1
@@ -102,3 +101,5 @@ install -v -m0644 sys-tree.h  "$SYSROOT/include/sys/tree.h"
 install -v -m0644 \
   "$MUSL_PATCHDIR/libexecinfo/execinfo.h" \
   "$SYSROOT/include/execinfo.h"
+
+$NO_CLEANUP || rm -rf "$MUSL_BUILD_DIR"

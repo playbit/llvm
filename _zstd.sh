@@ -6,4 +6,4 @@ make -C lib -j$NCPU DESTDIR="$ZSTD_DIR" PREFIX=/ \
   install-static install-includes install-pc
 
 _popd
-rm -rf "$ZSTD_DIR/build"
+$NO_CLEANUP || rm -rf "$ZSTD_DIR/build"
