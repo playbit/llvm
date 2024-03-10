@@ -425,5 +425,16 @@ if ! $NO_PACKAGE; then
     LLVM_STAGE2_DIR=$BUILD_DIR/llvm-$TARGET_TRIPLE
     echo "~~~~~~~~~~~~~~~~~~~~ package $TARGET_ARCH ~~~~~~~~~~~~~~~~~~~~"
     ( source _package.sh )
+    echo "sha256sum ${PACKAGE_ARCHIVE##$PWD0/}: $(sha256sum "$PACKAGE_ARCHIVE" | cut -d' ' -f1)"
+  done
+
+  TAG=$(date -u +%Y%m%d%H%M%S)
+  echo
+  echo "You can upload the archives to files.playb.it like this:"
+  for TARGET_TRIPLE in ${BUILD_TARGET_TRIPLES[@]}; do
+    TARGET_ARCH=${TARGET_TRIPLE%%-*}
+    PACKAGE_ARCHIVE=$BUILD_DIR/playbit-sdk-$TARGET_ARCH.tar.xz
+    REMOTE_ARCHIVE=playbit-sdk-$TARGET_ARCH-$TAG.tar.xz
+    echo "  ../playbit/tools/webfiles cp -v --sha256 ${PACKAGE_ARCHIVE##$PWD0/} $REMOTE_ARCHIVE"
   done
 fi
