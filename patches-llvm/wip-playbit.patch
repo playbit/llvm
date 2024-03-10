@@ -1,5 +1,5 @@
 diff --git a/clang/lib/Basic/Targets.cpp b/clang/lib/Basic/Targets.cpp
-index 636b59fd1..9fa3cf9ef 100644
+index 636b59fd1..27ee18253 100644
 --- a/clang/lib/Basic/Targets.cpp
 +++ b/clang/lib/Basic/Targets.cpp
 @@ -166,6 +166,8 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
@@ -50,14 +50,6 @@ index 636b59fd1..9fa3cf9ef 100644
        case llvm::Triple::UnknownOS:
        return std::make_unique<WebAssemblyOSTargetInfo<WebAssembly64TargetInfo>>(
            Triple, Opts);
-@@ -777,6 +790,7 @@ TargetInfo::CreateTargetInfo(DiagnosticsEngine &Diags,
-   // Construct the target
-   std::unique_ptr<TargetInfo> Target = AllocateTarget(Triple, *Opts);
-   if (!Target) {
-+    printf("[pb] err_target_unknown_triple (%s:%d)\n", __FILE__, __LINE__);
-     Diags.Report(diag::err_target_unknown_triple) << Triple.str();
-     return nullptr;
-   }
 diff --git a/clang/lib/Basic/Targets/OSTargets.h b/clang/lib/Basic/Targets/OSTargets.h
 index 8f4331b02..77204dd45 100644
 --- a/clang/lib/Basic/Targets/OSTargets.h
@@ -147,79 +139,25 @@ index bdbdad936..7b0ebc0a9 100644
        TC = std::make_unique<toolchains::PS4CPU>(*this, Target, Args);
        break;
 diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
-index 40038dce4..f902258a3 100644
+index 40038dce4..efaa979e8 100644
 --- a/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ b/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -404,6 +404,8 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
-   // handled somewhere else.
-   Args.ClaimAllArgs(options::OPT_w);
- 
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-+
-   if (!D.SysRoot.empty())
-     CmdArgs.push_back(Args.MakeArgString("--sysroot=" + D.SysRoot));
- 
-@@ -433,6 +435,8 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
-     CmdArgs.push_back(Arch == llvm::Triple::aarch64_be ? "-EB" : "-EL");
-   }
- 
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-+
-   // Most Android ARM64 targets should enable the linker fix for erratum
-   // 843419. Only non-Cortex-A53 devices are allowed to skip this flag.
-   if (Arch == llvm::Triple::aarch64 && (isAndroid || isOHOSFamily)) {
-@@ -441,19 +445,27 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
-       CmdArgs.push_back("--fix-cortex-a53-843419");
-   }
- 
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-+
+@@ -444,7 +444,6 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
    ToolChain.addExtraOpts(CmdArgs);
  
--  CmdArgs.push_back("--eh-frame-hdr");
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
- 
-+  CmdArgs.push_back("--eh-frame-hdr");
-+printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
+   CmdArgs.push_back("--eh-frame-hdr");
+-
    if (const char *LDMOption = getLDMOption(ToolChain.getTriple(), Args)) {
-+    printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
      CmdArgs.push_back("-m");
      CmdArgs.push_back(LDMOption);
-   } else {
-+    printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
+@@ -452,6 +451,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
      D.Diag(diag::err_target_unknown_triple) << Triple.str();
      return;
    }
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
++
    if (Triple.isRISCV())
      CmdArgs.push_back("-X");
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
  
-   if (Args.hasArg(options::OPT_shared))
-     CmdArgs.push_back("-shared");
-@@ -582,8 +594,12 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
-     CmdArgs.push_back("-lm");
-   }
- 
-+  printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-+
-   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_r)) {
-+    printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-     if (!Args.hasArg(options::OPT_nodefaultlibs)) {
-+      printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-       if (IsStatic || IsStaticPIE)
-         CmdArgs.push_back("--start-group");
- 
-@@ -609,7 +625,9 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
-         // FIXME: Does this really make sense for all GNU toolchains?
-         WantPthread = true;
- 
-+      printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-       AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
-+      printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
- 
-       // LLVM support for atomics on 32-bit SPARC V8+ is incomplete, so
-       // forcibly link with libatomic as a workaround.
 diff --git a/clang/lib/Driver/ToolChains/WebAssembly.cpp b/clang/lib/Driver/ToolChains/WebAssembly.cpp
 index 36bed3166..a5b7e6208 100644
 --- a/clang/lib/Driver/ToolChains/WebAssembly.cpp
