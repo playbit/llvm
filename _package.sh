@@ -28,7 +28,6 @@ _cpmerge $COMPILER_RT_DIR/bin bin  # hwasan_symbolize
 _cpmerge $BUILTINS_DIR/lib lib/clang/lib
 _cpmerge $COMPILER_RT_DIR/lib lib/clang/lib
 
-
 _cpmerge $LIBCXX_DIR/include/c++ sysroot-generic/include/c++
 
 # TARGET_TRIPLES=( x86_64-unknown-linux-musl ) # xxx
@@ -49,14 +48,6 @@ for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
   if [[ "$TARGET_TRIPLE" == *-linux* ]]; then
     mv $TARGET_SYSROOT/lib/libc*.so $TARGET_SYSROOT/lib/libc.so
   fi
-
-  # # TEMPORARY HACK -- remove when we have proper clang driver
-  # touch $TARGET_SYSROOT/lib/crtbegin.o
-  # touch $TARGET_SYSROOT/lib/crtend.o
-  # touch $TARGET_SYSROOT/lib/crtbeginS.o
-  # touch $TARGET_SYSROOT/lib/crtendS.o
-  # touch $TARGET_SYSROOT/lib/crtbeginT.o
-  # touch $TARGET_SYSROOT/lib/crtendT.o
 done
 
 # remove empty directories
