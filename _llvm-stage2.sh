@@ -1,4 +1,6 @@
 SELF_SCRIPT=$(realpath "${BASH_SOURCE[0]}")
+BUILD_DIR=$LLVM_STAGE2_DIR-build
+DESTDIR=$LLVM_STAGE2_DIR
 ENABLE_LLVM_DEV_FILES=false
 
 DIST_COMPONENTS=(
@@ -12,7 +14,6 @@ DIST_COMPONENTS=(
   llvm-cov \
   llvm-dlltool \
   llvm-dwarfdump \
-  llvm-libtool-darwin \
   llvm-nm \
   llvm-objcopy \
   llvm-objdump \
@@ -108,6 +109,10 @@ EXTRA_CMAKE_ARGS+=( -DCLANG_RESOURCE_DIR=../lib/clang )
 
 if $ENABLE_LTO; then
   EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_LTO=Thin )
+  # enable LTO cache when hacking on llvm, else link times will be very long
+  if $LLVM_SRC_CHANGE_TRACKING_ENABLED; then
+    CMAKE_LD_FLAGS+=( -Wl,--thinlto-cache-dir="'$BUILD_DIR/lto-cache'" )
+  fi
 fi
 
 if [ "$CBUILD" != "$CHOST" ]; then
@@ -189,8 +194,6 @@ CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS[@]:-} ${CMAKE_C_FLAGS[@]:-}"
 CMAKE_C_FLAGS="${CMAKE_C_FLAGS[@]:-}"
 CMAKE_LD_FLAGS="${CMAKE_LD_FLAGS[@]:-}"
 
-BUILD_DIR=$LLVM_STAGE2_DIR-build
-DESTDIR=$LLVM_STAGE2_DIR
 mkdir -p "$BUILD_DIR"
 _pushd "$BUILD_DIR"
 
@@ -327,6 +330,9 @@ fi
 # create binutils-compatible symlinks
 #   ack --type=cmake 'add_llvm_tool_symlink\(' build/s2-llvm-17.0.3 | cat
 BINUTILS_SYMLINKS=( # "alias target"
+  cc                clang \
+  c++               clang \
+  ld                lld \
   addr2line         llvm-symbolizer \
   ar                llvm-ar \
   bitcode_strip     llvm-bitcode-strip \
@@ -336,7 +342,6 @@ BINUTILS_SYMLINKS=( # "alias target"
   dlltool           llvm-ar \
   dwp               llvm-dwp \
   install_name_tool llvm-install-name-tool \
-  libtool           llvm-libtool-darwin \
   lipo              llvm-lipo \
   nm                llvm-nm \
   objcopy           llvm-objcopy \
