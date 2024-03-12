@@ -140,10 +140,10 @@ index bdbdad936..7b0ebc0a9 100644
        break;
 diff --git a/clang/lib/Driver/ToolChains/Playbit.cpp b/clang/lib/Driver/ToolChains/Playbit.cpp
 new file mode 100644
-index 000000000..4fa307bea
+index 000000000..eb4b0e43d
 --- /dev/null
 +++ b/clang/lib/Driver/ToolChains/Playbit.cpp
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,554 @@
 +//===--- Playbit.cpp - Playbit ToolChain Implementations --------*- C++ -*-===//
 +//
 +// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -484,7 +484,7 @@ index 000000000..4fa307bea
 +    getFilePaths().push_back(compiler_rt_lib_path);
 +    getLibraryPaths().push_back(compiler_rt_lib_path);
 +  }
-+  getFilePaths().push_back(fspath({ SysRoot + "/lib" }));
++  getFilePaths().push_back(fspath({ SysRoot, "lib" }));
 +
 +  // Default linker. Can be overridden with --ld-path= or -fuse-ld=
 +  // Absolute path to reduce I/O from ToolChain::GetLinkerPath & Driver::GetProgramPath
@@ -596,42 +596,31 @@ index 000000000..4fa307bea
 +
 +void Playbit::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
 +                                        ArgStringList &CC1Args) const {
-+  // printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
 +  if (DriverArgs.hasArg(options::OPT_nostdlibinc) ||
 +      DriverArgs.hasArg(options::OPT_nostdincxx))
 +    return;
 +
-+  switch (GetCXXStdlibType(DriverArgs)) {
-+  case ToolChain::CST_Libcxx: {
-+    std::string IncPath = fspath({getDriver().Dir, "..", "include"});
-+    std::string IncTargetPath =
-+        fspath({IncPath, getMultiarchTriple(getTriple()), "c++", "v1"});
-+    if (getVFS().exists(IncTargetPath)) {
-+      addSystemInclude(DriverArgs, CC1Args, fspath({IncPath, "c++", "v1"}));
-+      addSystemInclude(DriverArgs, CC1Args, IncTargetPath);
-+    }
-+    break;
-+  }
-+
-+  default:
-+    llvm_unreachable("invalid stdlib name");
++  std::string incPath = fspath({SysRoot, "include", "c++", "v1"});
++  if (getVFS().exists(incPath)) {
++    // SDK headers
++    addSystemInclude(DriverArgs, CC1Args, incPath);
++  } else {
++    // fall back to system headers. D.Dir == dirname(clang_argv[0])
++    std::string incPath = fspath({getDriver().Dir, "..", "include", "c++", "v1"});
++    if (getVFS().exists(incPath))
++      addSystemInclude(DriverArgs, CC1Args, incPath);
 +  }
 +}
 +
 +
-+void Playbit::AddCXXStdlibLibArgs(const ArgList &Args,
++void Playbit::AddCXXStdlibLibArgs(const ArgList &DriverArgs,
 +                                  ArgStringList &CmdArgs) const {
-+  // printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
-+  switch (GetCXXStdlibType(Args)) {
-+  case ToolChain::CST_Libcxx:
-+    CmdArgs.push_back("-lc++");
-+    CmdArgs.push_back("-lc++abi");
-+    CmdArgs.push_back("-lunwind");
-+    break;
-+
-+  case ToolChain::CST_Libstdcxx:
-+    llvm_unreachable("invalid stdlib name");
-+  }
++  if (DriverArgs.hasArg(options::OPT_nostdlib) ||
++      DriverArgs.hasArg(options::OPT_nostdlibxx))
++    return;
++  CmdArgs.push_back("-lc++");
++  CmdArgs.push_back("-lc++abi");
++  CmdArgs.push_back("-lunwind");
 +}
 +
 +
@@ -681,7 +670,7 @@ index 000000000..4fa307bea
 +    Res |= SanitizerKind::Thread;
 +    if (getTriple().getArch() == llvm::Triple::x86_64)
 +      Res |= SanitizerKind::KernelMemory;
-+    Res |= SanitizerKind::Scudo;
++    // Res |= SanitizerKind::Scudo;
 +    Res |= SanitizerKind::HWAddress;
 +    Res |= SanitizerKind::KernelHWAddress;
 +  }
