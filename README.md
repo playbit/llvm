@@ -5,8 +5,8 @@ llvm tools for Playbit (clang, lld, ar, objdump, etc)
 Use a pre-built version that matches your cpu architecture (`uname -m`):
 
 ```shell
-$ wget http://files.playb.it/playbit-sdk-aarch64-20240310221443.tar.xz
-$ mkdir sdk && tar -C sdk -xf playbit-sdk-aarch64-20240310221443.tar.xz
+$ wget http://files.playb.it/playbit-sdk-aarch64-20240312015803.tar.xz
+$ mkdir sdk && tar -C sdk -xf playbit-sdk-aarch64-20240312015803.tar.xz
 ```
 
 Build an example program:
@@ -51,10 +51,10 @@ To list available pre-built versions of the SDK, use tools/webfiles:
 
 ```shell
 $ tools/webfiles ls playbit-sdk-
-2024-03-10 15:16:02   65 Bytes playbit-sdk-aarch64-20240310221443.tar.xz.sha256
-2024-03-10 15:16:00   67.0 MiB playbit-sdk-aarch64-20240310221443.tar.xz
-2024-03-10 15:16:21   65 Bytes playbit-sdk-x86_64-20240310221443.tar.xz.sha256
-2024-03-10 15:16:19   70.9 MiB playbit-sdk-x86_64-20240310221443.tar.xz
+2024-03-10 15:16:02   65 Bytes playbit-sdk-aarch64-20240312015803.tar.xz.sha256
+2024-03-10 15:16:00   67.0 MiB playbit-sdk-aarch64-20240312015803.tar.xz
+2024-03-10 15:16:21   65 Bytes playbit-sdk-x86_64-20240312015803.tar.xz.sha256
+2024-03-10 15:16:19   70.9 MiB playbit-sdk-x86_64-20240312015803.tar.xz
 ```
 
 
