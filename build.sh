@@ -377,6 +377,8 @@ for TARGET_TRIPLE in ${BUILD_TARGET_TRIPLES[@]}; do
   _run_if_missing "$LLVM_STAGE2_DIR/bin/clang" _llvm-stage2.sh
   echo "Using llvm-stage2 at ${LLVM_STAGE2_DIR##$PWD0/}/"
 done
+CFLAGS=$BASE_CFLAGS
+LDFLAGS=$BASE_LDFLAGS
 
 [ -n "${PB_LLVM_STOP_AFTER_BUILD:-}" ] && exit 0
 
@@ -392,28 +394,6 @@ for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
     "$COMPILER_RT_DIR/lib/$TARGET_TRIPLE/libclang_rt.asan.a" _compiler-rt.sh
   echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/lib/$TARGET_TRIPLE/"
 done
-
-# # build compiler-rt for every TARGET_TRIPLE
-# # COMPILER_RT_DIR=$BUILD_DIR/compiler-rt-$TARGET_TRIPLE
-# # _run_if_missing "$COMPILER_RT_DIR/xxx" _compiler-rt.sh
-# #
-# # ( TARGET_TRIPLE=aarch64-unknown-linux-musl
-# #   COMPILER_RT_DIR=$BUILD_DIR/compiler-rt-$TARGET_TRIPLE
-# #   SYSROOT=$BUILD_DIR/sysroot-$TARGET_TRIPLE
-# #   _run_if_missing "$COMPILER_RT_DIR/xxx" _compiler-rt.sh
-# # )
-# #
-# COMPILER_RT_DIR=$BUILD_DIR/compiler-rt
-# for TARGET_TRIPLE2 in ${TARGET_TRIPLES[@]}; do
-#   # only builtins for wasm (built earliear), no sanitizers et al
-#   [[ $TARGET_TRIPLE2 == wasm* ]] && continue
-#   TARGET_TRIPLE=$TARGET_TRIPLE2 \
-#   SYSROOT=$BUILD_DIR/sysroot-$TARGET_TRIPLE2 \
-#   _run_if_missing \
-#     "$COMPILER_RT_DIR/lib/$TARGET_TRIPLE2/libclang_rt.asan.a" \
-#     _compiler-rt.sh
-# done
-# echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/"
 
 # ——————————————————————————————————————————————————————————————————————————————
 # step 3: package
