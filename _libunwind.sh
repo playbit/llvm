@@ -32,7 +32,10 @@ ALL_OBJECTS=()
 _gen_cc_buildrule() { # <srcfile>
   local dst=\$objdir/$(basename "$1").o
   ALL_OBJECTS+=( $dst )
-  echo "build $dst: cc $1" >> $NF
+  case "$1" in
+    *.cpp) echo "build $dst: cxx $1" >> $NF ;;
+    *)     echo "build $dst: cc $1" >> $NF ;;
+  esac
 }
 _gen_buildrules() { # <srcfile> ...
   echo >> $NF
@@ -43,6 +46,7 @@ _gen_buildrules() { # <srcfile> ...
 rm -rf "$BUILDDIR"
 mkdir -p "$BUILDDIR"
 _pushd "$BUILDDIR"
+CXXFLAGS="-fno-exceptions -fno-rtti"
 for TARGET_TRIPLE in ${TARGET_TRIPLES_TO_BUILD[@]}; do
   ALL_OBJECTS=()
   CFLAGS="--target=$TARGET_TRIPLE --sysroot=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE"
@@ -57,6 +61,10 @@ builddir = .
 objdir = \$builddir/obj
 rule cc
   command = $CC -MMD -MF \$out.d $CFLAGS \$FLAGS -c \$in -o \$out
+  depfile = \$out.d
+  description = cc \$in
+rule cxx
+  command = $CXX -MMD -MF \$out.d $CFLAGS $CXXFLAGS \$FLAGS -c \$in -o \$out
   depfile = \$out.d
   description = cc \$in
 rule ar
