@@ -121,8 +121,11 @@ fi
 BUILD_DIR_S1=${BUILD_DIR_S1:-$PWD/build-host}
 BUILD_DIR_S2=${BUILD_DIR_S2:-$PWD/build-target}
 
-STAGE1_CFLAGS=( -march=native )
+STAGE1_CFLAGS=()
 STAGE1_LDFLAGS=()
+if [ $HOST_ARCH = x86_64 ]; then
+  STAGE1_CFLAGS+=( -march=native )
+fi
 if [ "$HOST_SYS" = "macos" ]; then
   # -platform_version <platform> <min_version> <sdk_version>
   if [ $HOST_ARCH = x86_64 ]; then
@@ -207,6 +210,7 @@ mkdir -p "$BUILD_DIR"
 if [ $HOST_SYS = macos ]; then
   # Note: macOS SDK dir _must_ be named "MacOSX{version}.sdk"
   MAC_SDK=$BUILD_DIR_GENERIC/MacOSX${MAC_SDK_VERSION}.sdk
+  export MAC_SDK
   if [ ! -d "$MAC_SDK" ]; then
     _download_and_extract_tar "$MAC_SDK_URL" "$MAC_SDK" "$MAC_SDK_SHA256"
   fi

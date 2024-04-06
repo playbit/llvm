@@ -145,6 +145,7 @@ GENERIC_CFLAGS=(
   -funwind-tables \
   -Wno-user-defined-literals \
   -faligned-allocation \
+  -fno-modules \
 )
 GENERIC_CXXFLAGS=( # in addition to GENERIC_CFLAGS
   -std=c++20 \
@@ -171,6 +172,8 @@ GENERIC_LIBUNWIND_CFLAGS=(
   -fomit-frame-pointer \
   -fvisibility=hidden \
   -I$LIBUNWIND/include \
+  -fno-exceptions \
+  -fno-rtti \
 )
 # GENERIC_LIBCXXABI_CFLAGS+=( -DHAVE___CXA_THREAD_ATEXIT_IMPL ) # not in musl
 LIBUNWIND_OBJECTS=()

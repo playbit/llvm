@@ -3,11 +3,16 @@ _pushd "$LIBXML2_DIR/build"
 
 rm -f test/icu_parse_test.xml  # no icu
 
+CONFIGURE_ARGS=()
+if [ -n "${CHOST:-}" ]; then
+  CONFIGURE_ARGS+=( --host=$CHOST --build=$CBUILD )
+fi
+if [ -n "${SYSROOT:-}" ]; then
+  CONFIGURE_ARGS+=( --with-sysroot=$SYSROOT )
+fi
+
 ./configure \
   --prefix= \
-  --host=$CHOST \
-  --build=$CBUILD \
-  --with-sysroot=$SYSROOT \
   --with-pic \
   --enable-static \
   --with-zlib="$ZLIB_DIR" \
@@ -25,7 +30,8 @@ rm -f test/icu_parse_test.xml  # no icu
   --without-python \
   --without-readline \
   --without-modules \
-  --without-lzma
+  --without-lzma \
+  ${CONFIGURE_ARGS[@]:-}
 
 make -j$(nproc)
 

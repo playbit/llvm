@@ -48,7 +48,7 @@ SANITIZERS_TO_BUILD+=( ubsan_minimal )
 SANITIZERS_TO_BUILD+=( gwp_asan )
 SANITIZERS_TO_BUILD+=( asan_abi )
 
-CMAKE_ARGS+=( --fresh )
+# CMAKE_ARGS+=( --fresh )
 
 if [ $HOST_SYS = macos ]; then
   CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Darwin )

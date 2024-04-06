@@ -830,19 +830,6 @@ index 000000000..321518b1d
 +} // end namespace clang
 +
 +#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_Playbit_H
-diff --git a/compiler-rt/lib/builtins/CMakeLists.txt b/compiler-rt/lib/builtins/CMakeLists.txt
-index d62fa0432..73411382d 100644
---- a/compiler-rt/lib/builtins/CMakeLists.txt
-+++ b/compiler-rt/lib/builtins/CMakeLists.txt
-@@ -898,7 +898,7 @@ endif()
- # TODO: COMPILER_RT_BUILD_CRT used to be a cached variable so we need to unset
- # it first so cmake_dependent_option can set the local variable of the same
- # name. This statement can be removed in the future.
--unset(COMPILER_RT_BUILD_CRT CACHE)
-+#unset(COMPILER_RT_BUILD_CRT CACHE)
- 
- cmake_dependent_option(COMPILER_RT_BUILD_CRT "Build crtbegin.o/crtend.o" ON "COMPILER_RT_HAS_CRT" OFF)
- 
 diff --git a/llvm/include/llvm/TargetParser/Triple.h b/llvm/include/llvm/TargetParser/Triple.h
 index 79ccd644a..f97a2b1b9 100644
 --- a/llvm/include/llvm/TargetParser/Triple.h
