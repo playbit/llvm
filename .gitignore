@@ -1,5 +1,10 @@
 /build
 /build-s1
 /build-*
+/packages
 /_archive
 *.dSYM
+*.tar
+*.tar.xz
+/hello_c_*
+/hello_cc_*

@@ -9,8 +9,7 @@ LIBUNWIND=$LLVM_STAGE2_SRC/libunwind
 LIBCXXABI=$LLVM_STAGE2_SRC/libcxxabi
 LIBCXX=$LLVM_STAGE2_SRC/libcxx
 
-# TARGET_TRIPLES=( aarch64-unknown-linux-musl )
-# TARGET_TRIPLES=( wasm32-unknown-wasi )
+LIBCXX_ABI_VERSION=1
 
 
 # find sources
@@ -84,10 +83,8 @@ done
 
 
 # Generate __config_site file
-# See libcxx/include/__config_site.in
-# See libcxx/include/CMakeLists.txt & libcxx/CMakeLists.txt
-LIBCXX_ABI_VERSION=2
 mkdir -p include
+config_site=include/__config_site
 cat << END > include/__config_site
 #ifndef _LIBCPP___CONFIG_SITE
 #define _LIBCPP___CONFIG_SITE
@@ -96,18 +93,22 @@ cat << END > include/__config_site
 #define _LIBCPP_ABI_NAMESPACE __$LIBCXX_ABI_VERSION
 //undef _LIBCPP_ABI_FORCE_ITANIUM
 //undef _LIBCPP_ABI_FORCE_MICROSOFT
-#ifdef __wasm__
-  #define _LIBCPP_HAS_NO_THREADS
-  #define _LIBCPP_NO_EXCEPTIONS
-#endif
 //undef _LIBCPP_HAS_NO_MONOTONIC_CLOCK
-#define _LIBCPP_HAS_MUSL_LIBC
 //undef _LIBCPP_HAS_THREAD_API_PTHREAD
 //undef _LIBCPP_HAS_THREAD_API_EXTERNAL
 //undef _LIBCPP_HAS_THREAD_API_WIN32
-#ifdef __wasm__
-  #define _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS
-#endif
+END
+case $TARGET in
+wasm*)
+  echo "#define _LIBCPP_HAS_NO_THREADS" >> $config_site
+  echo "#define _LIBCPP_NO_EXCEPTIONS" >> $config_site
+  echo "#define _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS" >> $config_site
+  ;;
+*linux|*playbit)
+  echo "#define _LIBCPP_HAS_MUSL_LIBC" >> $config_site
+  ;;
+esac
+cat << END >> $config_site
 #define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS
 //undef _LIBCPP_NO_VCRUNTIME
 //undef _LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION
@@ -117,30 +118,32 @@ cat << END > include/__config_site
 //undef _LIBCPP_HAS_NO_WIDE_CHARACTERS
 #define _LIBCPP_ENABLE_ASSERTIONS_DEFAULT 0
 #define _LIBCPP_DISABLE_EXTERN_TEMPLATE
-
-// PSTL backends
-#ifdef __wasm__
-  #define _LIBCPP_PSTL_CPU_BACKEND_SERIAL
-#else
-  #define _LIBCPP_PSTL_CPU_BACKEND_THREAD
-#endif
-//undef _LIBCPP_PSTL_CPU_BACKEND_LIBDISPATCH
-
-// Hardening
-#ifdef __wasm__
-  #define _LIBCPP_ENABLE_HARDENED_MODE_DEFAULT 0
-#else
-  #define _LIBCPP_ENABLE_HARDENED_MODE_DEFAULT 1
-#endif
-#define _LIBCPP_ENABLE_DEBUG_MODE_DEFAULT 0
-
-#endif
 END
+
+echo "" >> $config_site
+echo "// PSTL backends" >> $config_site
+case $TARGET in
+wasm*) echo "#define _LIBCPP_PSTL_CPU_BACKEND_SERIAL" >> $config_site ;;
+*)     echo "#define _LIBCPP_PSTL_CPU_BACKEND_THREAD" >> $config_site ;;
+esac
+echo "//undef _LIBCPP_PSTL_CPU_BACKEND_LIBDISPATCH" >> $config_site
+
+echo "" >> $config_site
+echo "// Hardening" >> $config_site
+case $TARGET in
+wasm*) echo "#define _LIBCPP_ENABLE_HARDENED_MODE_DEFAULT 1" >> $config_site ;;
+*)     echo "#define _LIBCPP_ENABLE_HARDENED_MODE_DEFAULT 0" >> $config_site ;;
+esac
+echo "#define _LIBCPP_ENABLE_DEBUG_MODE_DEFAULT 0" >> $config_site
+
+echo "" >> $config_site
+echo "#endif" >> $config_site
 
 
 # generate build files
 GENERIC_CFLAGS=(
-  -fPIC -O2 -DNDEBUG "-resource-dir=$BUILTINS_DIR/" \
+  -fPIC -O2 -DNDEBUG -resource-dir="$BUILTINS_DIR_FOR_S1_CC/" \
+  -isystem$S1_CLANGRES_DIR/include \
   -nostdlib \
   -funwind-tables \
   -Wno-user-defined-literals \
@@ -208,39 +211,38 @@ _gen_buildrules() { # <srcfile> ...
     _gen_cc_buildrule $src
   done
 }
-for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-  LIBUNWIND_OBJECTS=()
-  LIBCXXABI_OBJECTS=()
-  LIBCXX_OBJECTS=()
-  CFLAGS="--target=$TARGET_TRIPLE --sysroot=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE"
-  CXXFLAGS="--target=$TARGET_TRIPLE --sysroot=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE"
-  CFLAGS="$CFLAGS -I./include-$TARGET_TRIPLE ${GENERIC_CXXFLAGS[@]}"
-  CXXFLAGS="$CXXFLAGS -I./include ${GENERIC_CXXFLAGS[@]}"
-  CXXFLAGS="$CXXFLAGS -isystem$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE/include"
-  CXXFLAGS="$CXXFLAGS -isystem$S1_CLANGRES_DIR/include"
-  CXXFLAGS="$CXXFLAGS ${GENERIC_CFLAGS[@]}"
-  CFLAGS="$CFLAGS ${GENERIC_CFLAGS[@]}"
-  # note: don't build with LTO, even when ENABLE_LTO=true
 
-  LIBUNWIND_CFLAGS=${GENERIC_LIBUNWIND_CFLAGS[@]}
-  LIBCXXABI_CFLAGS=${GENERIC_LIBCXXABI_CFLAGS[@]}
-  LIBCXX_CFLAGS=${GENERIC_LIBCXX_CFLAGS[@]}
-  if [[ $TARGET_TRIPLE == *wasm* ]]; then
-    CFLAGS="$CFLAGS -fno-exceptions"
-    CXXFLAGS="$CXXFLAGS -fno-exceptions"
-    CFLAGS="$CFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"
-    CXXFLAGS="$CXXFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"
-    LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -D_LIBCXXABI_HAS_NO_THREADS"
-    # if LIBCXXABI_HERMETIC_STATIC_LIBRARY:
-    LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS"
-    # if LIBCXXABI_HERMETIC_STATIC_LIBRARY and LIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS:
-    LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -fvisibility-global-new-delete-hidden"
-  else
-    LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -D_LIBCPP_HAS_THREAD_API_PTHREAD"
-  fi
-  NF=build-$TARGET_TRIPLE.ninja
-  echo "Generating ${PWD##$PWD0/}/$NF"
-  cat << _END > $NF
+LIBUNWIND_OBJECTS=()
+LIBCXXABI_OBJECTS=()
+LIBCXX_OBJECTS=()
+CXXFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS ${GENERIC_CXXFLAGS[@]}"
+CXXFLAGS="$CXXFLAGS -I$(dirname $config_site) ${GENERIC_CXXFLAGS[@]}"
+CXXFLAGS="$CXXFLAGS -isystem$SYSROOT/include"
+CXXFLAGS="$CXXFLAGS -isystem$S1_CLANGRES_DIR/include"
+CXXFLAGS="$CXXFLAGS ${GENERIC_CFLAGS[@]}"
+CFLAGS="$CFLAGS ${GENERIC_CFLAGS[@]}"
+# note: don't build with LTO, even when ENABLE_LTO=true
+
+LIBUNWIND_CFLAGS=${GENERIC_LIBUNWIND_CFLAGS[@]}
+LIBCXXABI_CFLAGS=${GENERIC_LIBCXXABI_CFLAGS[@]}
+LIBCXX_CFLAGS=${GENERIC_LIBCXX_CFLAGS[@]}
+if [[ $TARGET == wasm* ]]; then
+  CFLAGS="$CFLAGS -fno-exceptions"
+  CXXFLAGS="$CXXFLAGS -fno-exceptions"
+  CFLAGS="$CFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"
+  CXXFLAGS="$CXXFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"
+  LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -D_LIBCXXABI_HAS_NO_THREADS"
+  # if LIBCXXABI_HERMETIC_STATIC_LIBRARY:
+  LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS"
+  # if LIBCXXABI_HERMETIC_STATIC_LIBRARY and LIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS:
+  LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -fvisibility-global-new-delete-hidden"
+else
+  LIBCXXABI_CFLAGS="$LIBCXXABI_CFLAGS -D_LIBCPP_HAS_THREAD_API_PTHREAD"
+fi
+NF=build.ninja
+echo "Generating ${PWD##$PWD0/}/$NF"
+cat << _END > $NF
 ninja_required_version = 1.3
 builddir = .
 objdir = \$builddir/obj
@@ -259,31 +261,28 @@ rule ar
   command = $AR crs \$out \$in
   description = ar \$out
 _END
-  echo >> $NF
-  _gen_buildrules ${GENERIC_SOURCES[@]}
-  if [[ $TARGET_TRIPLE == wasm* ]]; then
-    _gen_buildrules ${WASM_SOURCES[@]}
-  else
-    _gen_buildrules ${NON_WASM_SOURCES[@]}
-  fi
-  if [[ $TARGET_TRIPLE == aarch64-* ]]; then
-    _gen_buildrules ${ARM_SOURCES[@]}
-  fi
-  echo >> $NF
-  if [ ${#LIBUNWIND_OBJECTS[@]} -gt 0 ]; then
-    echo "build libunwind-$TARGET_TRIPLE.a: ar ${LIBUNWIND_OBJECTS[*]}" >> $NF
-  fi
-  echo "build libc++abi-$TARGET_TRIPLE.a: ar ${LIBCXXABI_OBJECTS[*]}" >> $NF
-  echo "build libc++-$TARGET_TRIPLE.a: ar ${LIBCXX_OBJECTS[*]}" >> $NF
-done
+echo >> $NF
+_gen_buildrules ${GENERIC_SOURCES[@]}
+if [[ $TARGET == wasm* ]]; then
+  _gen_buildrules ${WASM_SOURCES[@]}
+else
+  _gen_buildrules ${NON_WASM_SOURCES[@]}
+fi
+if [[ $TARGET == aarch64-* ]]; then
+  _gen_buildrules ${ARM_SOURCES[@]}
+fi
+echo >> $NF
+if [ ${#LIBUNWIND_OBJECTS[@]} -gt 0 ]; then
+  echo "build libunwind.a: ar ${LIBUNWIND_OBJECTS[*]}" >> $NF
+fi
+echo "build libc++abi.a: ar ${LIBCXXABI_OBJECTS[*]}" >> $NF
+echo "build libc++.a: ar ${LIBCXX_OBJECTS[*]}" >> $NF
 
 
 # build
-for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-  libs=( libc++abi-$TARGET_TRIPLE.a libc++-$TARGET_TRIPLE.a )
-  [[ $TARGET_TRIPLE != wasm* ]] && libs+=( libunwind-$TARGET_TRIPLE.a )
-  NINJA_STATUS="[libc++ $TARGET_TRIPLE %f/%t] " \
-  ninja -f build-$TARGET_TRIPLE.ninja ${libs[@]}
+libs=( libc++abi libc++ ); [[ $TARGET != wasm* ]] && libs+=( libunwind )
+for lib in ${libs[@]}; do
+  NINJA_STATUS="[$lib %f/%t] " ninja -f build.ninja $lib.a
 done
 
 
@@ -295,7 +294,7 @@ cp -a $LIBCXX/include "$DESTDIR/include/c++/v1"
 
 install -v -m0644 "$LIBCXXABI"/include/*.h "$DESTDIR/include/c++/v1"
 
-install -v -m0644 include/__config_site "$DESTDIR/include/c++/v1/__config_site"
+install -v -m0644 $config_site "$DESTDIR/include/c++/v1/__config_site"
 
 install -v -m0644 "$LIBUNWIND/include/__libunwind_config.h" "$DESTDIR/include"
 install -v -m0644 "$LIBUNWIND/include/libunwind.h"          "$DESTDIR/include"
@@ -303,13 +302,10 @@ install -v -m0644 "$LIBUNWIND/include/unwind.h"             "$DESTDIR/include"
 install -v -m0644 "$LIBUNWIND/include/unwind_arm_ehabi.h"   "$DESTDIR/include"
 install -v -m0644 "$LIBUNWIND/include/unwind_itanium.h"     "$DESTDIR/include"
 
-for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-  mkdir -p "$DESTDIR/lib-$TARGET_TRIPLE"
-  libs=( libc++abi libc++ ); [[ $TARGET_TRIPLE != wasm* ]] && libs+=( libunwind )
-  for lib in ${libs[@]}; do
-    echo "install: ${DESTDIR##$PWD0/}/lib-$TARGET_TRIPLE/$lib.a"
-    mv $lib-$TARGET_TRIPLE.a "$DESTDIR/lib-$TARGET_TRIPLE/$lib.a"
-  done
+mkdir -p "$DESTDIR/lib"
+for lib in ${libs[@]}; do
+  echo "install: ${DESTDIR##$PWD0/}/lib/$lib.a"
+  mv $lib.a "$DESTDIR/lib/$lib.a"
 done
 
 find "$DESTDIR/include" \( -name '.*' -o -name '*.txt' -o -name '*.in' \) -delete

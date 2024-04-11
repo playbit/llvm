@@ -20,11 +20,13 @@ if $LLVM_SRC_CHANGE_TRACKING_ENABLED; then
   git tag base
 fi
 
-# patches from aports/main/llvm{VERSION}
 for f in $(echo "$LLVM_PATCHDIR"/*.patch | sort); do
   echo "applying patch ${f##$PWD0/}"
   patch -p1 < "$f"
 done
+
+_symlink clang/lib/Driver/ToolChains/Playbit.h   $LLVM_PATCHDIR/Playbit.h
+_symlink clang/lib/Driver/ToolChains/Playbit.cpp $LLVM_PATCHDIR/Playbit.cpp
 
 if $LLVM_SRC_CHANGE_TRACKING_ENABLED; then
   git commit -a -m "initial patches"

@@ -1,0 +1,87 @@
+diff --git a/clang/lib/Driver/ToolChains/Darwin.cpp b/clang/lib/Driver/ToolChains/Darwin.cpp
+index 65bd6c6a7..3433e4186 100644
+--- a/clang/lib/Driver/ToolChains/Darwin.cpp
++++ b/clang/lib/Driver/ToolChains/Darwin.cpp
+@@ -35,6 +35,26 @@ using namespace clang::driver::toolchains;
+ using namespace clang;
+ using namespace llvm::opt;
+ 
++static llvm::SmallString<128> llvmsdk_sysroot(
++  const Driver &D, const llvm::Triple &triple) {
++  // [llvmsdk] sysroot
++  // I.e. if realpath of clang exe is /foo/bin/clang, start with /foo
++  llvm::SmallString<128> Path(
++    llvm::sys::path::parent_path(
++      llvm::sys::path::parent_path(D.getClangProgramPath())));
++  llvm::sys::path::append(Path, "sysroot");
++  llvm::sys::path::append(Path, "macos");
++  // Note: for historical reasons aarch64 is called arm64 in darwin triple.
++  // Since getTriple().getArchName() returns the substring of the triple rather
++  // than the canonical name of the arch, we don't use that function for aarch64.
++  if (triple.getArch() == llvm::Triple::ArchType::aarch64) {
++    llvm::sys::path::append(Path, "aarch64");
++  } else {
++    llvm::sys::path::append(Path, triple.getArchName().str());
++  }
++  return Path;
++}
++
+ static VersionTuple minimumMacCatalystDeploymentTarget() {
+   return VersionTuple(13, 1);
+ }
+@@ -439,6 +459,9 @@ void darwin::Linker::AddLinkArgs(Compilation &C, const ArgList &Args,
+   } else if (const Arg *A = Args.getLastArg(options::OPT_isysroot)) {
+     CmdArgs.push_back("-syslibroot");
+     CmdArgs.push_back(A->getValue());
++  } else {
++    CmdArgs.push_back("-syslibroot");
++    CmdArgs.push_back(Args.MakeArgString(llvmsdk_sysroot(D, getToolChain().getTriple())));
+   }
+ 
+   Args.AddLastArg(CmdArgs, options::OPT_twolevel__namespace);
+@@ -1990,9 +2013,18 @@ std::string getOSVersion(llvm::Triple::OSType OS, const llvm::Triple &Triple,
+   case llvm::Triple::MacOSX:
+     // If there is no version specified on triple, and both host and target are
+     // macos, use the host triple to infer OS version.
+-    if (Triple.isMacOSX() && SystemTriple.isMacOSX() &&
++    // [llvmsdk] use predefined macos version when using default sysroot
++    if (TheDriver.SysRoot.empty()) {
++      if (Triple.getArch() == llvm::Triple::aarch64)
++        OsVersion = VersionTuple(11, 0);
++      else
++        OsVersion = VersionTuple(10, 15);
++    }
++    else if (Triple.isMacOSX() && SystemTriple.isMacOSX() &&
+         !Triple.getOSMajorVersion())
++    {
+       SystemTriple.getMacOSXVersion(OsVersion);
++    }
+     else if (!Triple.getMacOSXVersion(OsVersion))
+       TheDriver.Diag(diag::err_drv_invalid_darwin_version)
+           << Triple.getOSName();
+@@ -2354,6 +2386,7 @@ static void AppendPlatformPrefix(SmallString<128> &Path,
+   }
+ }
+ 
++
+ // Returns the effective sysroot from either -isysroot or --sysroot, plus the
+ // platform prefix (if any).
+ llvm::SmallString<128>
+@@ -2363,6 +2396,8 @@ DarwinClang::GetEffectiveSysroot(const llvm::opt::ArgList &DriverArgs) const {
+     Path = DriverArgs.getLastArgValue(options::OPT_isysroot);
+   else if (!getDriver().SysRoot.empty())
+     Path = getDriver().SysRoot;
++  else
++    return llvmsdk_sysroot(getDriver(), getTriple()); // ignore EffectiveTriple
+ 
+   if (hasEffectiveTriple()) {
+     AppendPlatformPrefix(Path, getEffectiveTriple());
+@@ -2561,6 +2596,8 @@ void DarwinClang::AddCXXStdlibLibArgs(const ArgList &Args,
+   switch (Type) {
+   case ToolChain::CST_Libcxx:
+     CmdArgs.push_back("-lc++");
++    if (!Args.hasArg(options::OPT_isysroot) && getDriver().SysRoot.empty())
++      CmdArgs.push_back("-lc++abi");
+     if (Args.hasArg(options::OPT_fexperimental_library))
+       CmdArgs.push_back("-lc++experimental");
+     break;

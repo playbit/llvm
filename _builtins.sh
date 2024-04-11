@@ -1,4 +1,4 @@
-BUILDDIR=$BUILTINS_DIR/build
+BUILDDIR=$BUILTINS_DIR-build
 DESTDIR=$BUILTINS_DIR
 
 _pushd "$LLVM_STAGE2_SRC/compiler-rt/lib/builtins"
@@ -426,6 +426,7 @@ _popd
 
 _pushd "$BUILDDIR"
 
+
 ALL_OBJECTS=()
 
 _gen_buildrule() { # <rule> <srcfile>
@@ -458,29 +459,25 @@ _gen_buildrules_aarch64_lse() {
   done
 }
 
-for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-  ALL_OBJECTS=()
-  CFLAGS="--target=$TARGET_TRIPLE --sysroot=$BUILD_DIR_S2/sysroot-$TARGET_TRIPLE"
-  CFLAGS="$CFLAGS -fPIC -fno-builtin -fomit-frame-pointer -fvisibility=hidden -O2"
-  # CFLAGS="$CFLAGS -isystem$LLVM_STAGE1_DIR/include"
+CFLAGS="$CFLAGS -fPIC -fno-lto -fno-builtin -fomit-frame-pointer -fvisibility=hidden -O2"
 
-  case $TARGET_TRIPLE in
-    riscv*)
-      # for riscv/int_mul_impl.inc, included by riscv{32,64}/muldi3.S
-      CFLAGS="$CFLAGS -Iriscv"
-      ;;
-    aarch64*)
-      # Assume target CPU has FEAT_LSE (CAS, atomic ops, SWP, etc.)
-      # See https://learn.arm.com/learning-paths/servers-and-cloud-computing/lse/intro/
-      # if (compiles("asm(\".arch armv8-a+lse\");asm(\"cas w0, w1, [x2]\");"))
-      CFLAGS="$CFLAGS -DHAS_ASM_LSE=1"
-      ;;
-  esac
+case $TARGET in
+  riscv*)
+    # for riscv/int_mul_impl.inc, included by riscv{32,64}/muldi3.S
+    CFLAGS="$CFLAGS -Iriscv"
+    ;;
+  aarch64*)
+    # Assume target CPU has FEAT_LSE (CAS, atomic ops, SWP, etc.)
+    # See https://learn.arm.com/learning-paths/servers-and-cloud-computing/lse/intro/
+    # if (compiles("asm(\".arch armv8-a+lse\");asm(\"cas w0, w1, [x2]\");"))
+    CFLAGS="$CFLAGS -DHAS_ASM_LSE=1"
+    ;;
+esac
 
-  NF=build-$TARGET_TRIPLE.ninja
-  echo "Generating ${PWD##$PWD0/}/$NF"
+NF=build.ninja
+echo "Generating ${PWD##$PWD0/}/$NF"
 
-  cat << _END > $NF
+cat << _END > $NF
 ninja_required_version = 1.3
 builddir = build
 objdir = \$builddir/obj
@@ -496,46 +493,76 @@ rule ar
   description = ar \$out
 _END
 
-  _gen_buildrules ${GENERIC_SOURCES[@]}
+# generic sources
+_gen_buildrules ${GENERIC_SOURCES[@]}
 
-  case $TARGET_TRIPLE in
-    aarch64-*) LIB_SUFFIX=-aarch64
-      echo >> $NF
-      for src in "${AARCH64_SOURCES[@]}"; do
-        case $src in
-          aarch64/lse.S) _gen_buildrules_aarch64_lse $src ;;
-          *)             _gen_buildrule cc $src ;;
-        esac
-      done
-      ;;
-    x86_64-*) LIB_SUFFIX=-x86_64
-      _gen_buildrules ${X86_ARCH_SOURCES[@]}
-      _gen_buildrules ${X86_64_SOURCES[@]}
-      ;;
-    riscv32-*) LIB_SUFFIX=-riscv32
-      _gen_buildrules ${RISCV_SOURCES[@]}
-      _gen_buildrules ${RISCV32_SOURCES[@]}
-      ;;
-    riscv64-*) LIB_SUFFIX=-riscv64
-      _gen_buildrules ${RISCV_SOURCES[@]}
-      _gen_buildrules ${RISCV64_SOURCES[@]}
-      ;;
-    wasm32-*) LIB_SUFFIX=-wasm32
-      ;;
-    *) _err "unexpected TARGET_TRIPLE=$TARGET_TRIPLE"
-      ;;
-  esac
+# arch-specific sources
+case $TARGET in
+  aarch64-*) LIB_SUFFIX=-aarch64
+    echo >> $NF
+    for src in "${AARCH64_SOURCES[@]}"; do
+      case $src in
+        aarch64/lse.S) _gen_buildrules_aarch64_lse $src ;;
+        *)             _gen_buildrule cc $src ;;
+      esac
+    done
+    ;;
+  x86_64-*) LIB_SUFFIX=-x86_64
+    _gen_buildrules ${X86_ARCH_SOURCES[@]}
+    _gen_buildrules ${X86_64_SOURCES[@]}
+    ;;
+  riscv32-*) LIB_SUFFIX=-riscv32
+    _gen_buildrules ${RISCV_SOURCES[@]}
+    _gen_buildrules ${RISCV32_SOURCES[@]}
+    ;;
+  riscv64-*) LIB_SUFFIX=-riscv64
+    _gen_buildrules ${RISCV_SOURCES[@]}
+    _gen_buildrules ${RISCV64_SOURCES[@]}
+    ;;
+  wasm32-*) LIB_SUFFIX=-wasm32
+    ;;
+  *) _err "unexpected TARGET=$TARGET"
+    ;;
+esac
 
-  echo "build $DESTDIR/lib/$TARGET_TRIPLE/libclang_rt.builtins.a: ar ${ALL_OBJECTS[*]}" >> $NF
-  echo "default $DESTDIR/lib/$TARGET_TRIPLE/libclang_rt.builtins.a" >> $NF
-done
+# system-specific sources
+case $TARGET in
+  *macos*)
+    _gen_buildrules ${DARWIN_SOURCES[@]}
+    ;;
+esac
+
+echo "build $DESTDIR/lib/libclang_rt.builtins.a: ar ${ALL_OBJECTS[*]}" >> $NF
+echo "default $DESTDIR/lib/libclang_rt.builtins.a" >> $NF
 
 # build & install
-for TARGET_TRIPLE in ${TARGET_TRIPLES[@]}; do
-  rm -rf "$DESTDIR/lib/$TARGET_TRIPLE"
-  mkdir -p "$DESTDIR/lib/$TARGET_TRIPLE"
-  ninja -f build-$TARGET_TRIPLE.ninja
-done
+rm -rf "$DESTDIR"
+mkdir -p "$DESTDIR/lib"
+NINJA_STATUS="[builtins %f/%t] " \
+ninja -f build.ninja
+
+# compatibility layout for s1 compiler
+TARGET_ARCH=${TARGET%%-*}
+case $TARGET in
+  wasm32*)
+    mkdir -p "$BUILTINS_DIR_FOR_S1_CC/lib/wasm32"
+    cp "$DESTDIR/lib/libclang_rt.builtins.a" \
+       "$BUILTINS_DIR_FOR_S1_CC/lib/wasm32/libclang_rt.builtins-$TARGET_ARCH.a"
+    ;;
+  *linux|*playbit)
+    mkdir -p "$BUILTINS_DIR_FOR_S1_CC/lib/linux"
+    cp "$DESTDIR/lib/libclang_rt.builtins.a" \
+       "$BUILTINS_DIR_FOR_S1_CC/lib/linux/libclang_rt.builtins-$TARGET_ARCH.a"
+    ;;
+  *macos)
+    mkdir -p "$BUILTINS_DIR_FOR_S1_CC/lib/darwin"
+    cp "$DESTDIR/lib/libclang_rt.builtins.a" \
+       "$BUILTINS_DIR_FOR_S1_CC/lib/darwin/libclang_rt.builtins-$TARGET_ARCH.a"
+    ;;
+  *)
+    _err "TODO: compatibility layout for s1, TARGET=$TARGET"
+    ;;
+esac
 
 _popd
 $NO_CLEANUP || rm -rf "$BUILDDIR"

@@ -1,0 +1,9 @@
+git -C build/s2-llvm-17.0.3 diff base -- \
+  clang/lib/Driver/ToolChains/WebAssembly.cpp \
+  clang/lib/Driver/ToolChains/WebAssembly.h \
+  > patches-llvm/clang-wasm.patch
+
+git -C build/s2-llvm-17.0.3 diff -- \
+  clang/lib/Driver/ToolChains/Darwin.cpp \
+  clang/lib/Driver/ToolChains/Darwin.h \
+  > patches-llvm/clang-darwin.patch

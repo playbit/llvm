@@ -11,24 +11,14 @@ for f in $(echo "$MUSL_PATCHDIR"/*.patch | sort); do
 done
 
 ENABLE_EXECINFO=true
+CC_TRIPLE=$(_clang_triple $TARGET)
 
-# _CFLAGS=(
-#   --target=$TARGET_TRIPLE \
-#   --sysroot=$SYSROOT \
-#   -isystem$LLVM_STAGE1_DIR/include \
-#   -fPIC \
-# )
-# _LDFLAGS=(
-#   --target=$TARGET_TRIPLE \
-#   --sysroot=$SYSROOT \
-#   --rtlib=compiler-rt \
-#   --ld-path=$LLVM_STAGE1_DIR/bin/ld.lld \
-# )
-# export CFLAGS="${CFLAGS:-} --target=$TARGET_TRIPLE --sysroot=$SYSROOT"
-# export LDFLAGS="${_LDFLAGS[@]}"
-
+# disable LTO
+# Note: musl (1.2.4) does not compile with LTO. Linking will fail with:
+#   error: undefined hidden symbol: __dls2
+CFLAGS="$CFLAGS -fno-lto" \
 ./configure \
-  --target=$TARGET_TRIPLE \
+  --target=$CC_TRIPLE \
   --build=$HOST_TRIPLE \
   --prefix="" \
   --sysconfdir=/etc \

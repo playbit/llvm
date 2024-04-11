@@ -1,7 +1,7 @@
 SELF_SCRIPT=$(realpath "${BASH_SOURCE[0]}")
 BUILD_DIR=$LLVM_STAGE2_DIR-build
 DESTDIR=$LLVM_STAGE2_DIR
-ENABLE_LLVM_DEV_FILES=false
+ENABLE_LLVM_DEV_FILES=true
 
 DIST_COMPONENTS=(
   clang \
@@ -28,6 +28,7 @@ DIST_COMPONENTS=(
   llvm-symbolizer \
   llvm-tblgen \
   llvm-xray \
+  llvm-libtool-darwin \
 )
 # components without install targets
 EXTRA_COMPONENTS=()
@@ -63,14 +64,30 @@ CMAKE_CXX_FLAGS=( \
   "-I$LIBCXX_DIR/include" \
   "-isystem$SYSROOT/include" \
 )
-CMAKE_LD_FLAGS=( $LDFLAGS -lc++ -lc++abi )
+CMAKE_LD_FLAGS=( $LDFLAGS -L$LIBCXX_DIR/lib -lc++abi )
+# CMAKE_LD_FLAGS=( $LDFLAGS -L$LIBCXX_DIR/lib -lc++ -lc++abi )
 EXTRA_CMAKE_ARGS=( -Wno-dev )
 # CMAKE_CXX_FLAGS+=( -nostdinc++ )
 # CMAKE_LD_FLAGS+=( -nostdlib++ )
 
 ENABLE_STATIC_LINKING=true
-CMAKE_C_FLAGS+=( -static )
-CMAKE_LD_FLAGS+=( -static )
+case $TARGET in
+  *linux|*playbit|wasm*)
+    CMAKE_C_FLAGS+=( -static )
+    CMAKE_LD_FLAGS+=( -static )
+    ;;
+  *macos*)
+    EXTRA_CMAKE_ARGS+=( \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=$MAC_TARGET_VERSION \
+      -DCMAKE_OSX_SYSROOT="$SYSROOT" \
+      -DCMAKE_LIBTOOL="$LIBTOOL" \
+    )
+    case $TARGET in
+      x86_64*)  EXTRA_CMAKE_ARGS+=( -DCMAKE_OSX_ARCHITECTURES=x86_64 ) ;;
+      aarch64*) EXTRA_CMAKE_ARGS+=( -DCMAKE_OSX_ARCHITECTURES=arm64 ) ;;
+    esac
+    ;;
+esac
 
 # note: there are clang-specific option, even though it doesn't start with CLANG_
 # See: llvm/clang/CMakeLists.txt
@@ -80,7 +97,7 @@ CMAKE_LD_FLAGS+=( -static )
 # I.e. sysroot=foo with clang at /bin/clang results in sysroot=/bin/foo.
 # See line ~200 of clang/lib/Driver/Driver.cpp
 EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="" )
-# EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="../sysroot-${TARGET_TRIPLE%%-*}/" )
+# EXTRA_CMAKE_ARGS+=( -DDEFAULT_SYSROOT="../sysroot-${TARGET%%-*}/" )
 #
 # C_INCLUDE_DIRS is a colon-separated list of paths to search by default.
 # Relative paths are relative to sysroot.
@@ -107,24 +124,31 @@ EXTRA_CMAKE_ARGS+=( -DGENERATOR_IS_MULTI_CONFIG=ON )
 # CLANG_RESOURCE_DIR: /lib/clang/VERSION by default
 EXTRA_CMAKE_ARGS+=( -DCLANG_RESOURCE_DIR=../lib/clang )
 
+# CLANG_REPOSITORY_STRING: set to "" to disable inclusion of git information
+# in "clang --version"
+EXTRA_CMAKE_ARGS+=( -DCLANG_REPOSITORY_STRING= )
+
 if $ENABLE_LTO; then
   EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_LTO=Thin )
   # enable LTO cache when hacking on llvm, else link times will be very long
   if $LLVM_SRC_CHANGE_TRACKING_ENABLED; then
-    CMAKE_LD_FLAGS+=( -Wl,--thinlto-cache-dir="'$BUILD_DIR/lto-cache'" )
+    case $TARGET in
+      *linux|*playbit|*wasm*) # ld.lld, wasm-ld
+        CMAKE_LD_FLAGS+=( -Wl,--thinlto-cache-dir="'$BUILD_DIR/lto-cache'" ) ;;
+      *macos*) # ld64.lld
+        CMAKE_LD_FLAGS+=( -Wl,-cache_path_lto,"'$BUILD_DIR/lto-cache'" ) ;;
+    esac
   fi
 fi
 
-if [ "$CBUILD" != "$CHOST" ]; then
-  case "$HOST_SYS" in
-    linux) EXTRA_CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Linux ) ;;
-    macos) EXTRA_CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Darwin ) ;;
-  esac
-  case "$TARGET_TRIPLE" in
-    *linux*) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Linux ) ;;
-    *macos*) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Darwin ) ;;
-  esac
-fi
+case "$HOST_SYS" in
+  linux) EXTRA_CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Linux ) ;;
+  macos) EXTRA_CMAKE_ARGS+=( -DCMAKE_HOST_SYSTEM_NAME=Darwin ) ;;
+esac
+case "$TARGET" in
+  *linux|*playbit) EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Linux ) ;;
+  *macos*)         EXTRA_CMAKE_ARGS+=( -DCMAKE_SYSTEM_NAME=Darwin ) ;;
+esac
 
 # This is a hack!
 # llvm's cmake files checks if this is ON, and if it is, llvm will attempt
@@ -136,11 +160,17 @@ EXTRA_CMAKE_ARGS+=(
   -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=ON \
 )
 
-# EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=$TARGET_TRIPLE )
-EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=${TARGET_TRIPLE%%-*}-unknown-playbit )
+# EXTRA_CMAKE_ARGS+=( -DLLVM_DEFAULT_TARGET_TRIPLE=$(_clang_triple $TARGET) )
+case "$TARGET" in
+  *playbit) DEFAULT_TARGET_TRIPLE=${TARGET%%-*}-unknown-playbit ;;
+  *)        DEFAULT_TARGET_TRIPLE=$(_clang_triple $TARGET) ;;
+esac
 
-# EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER=lld )
-EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER= )
+if [[ $TARGET == *macos ]]; then
+  EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER=lld )
+else
+  EXTRA_CMAKE_ARGS+=( -DCLANG_DEFAULT_LINKER= )
+fi
 
 CMAKE_LD_FLAGS+=( -L"$SYSROOT/lib" )
 # CMAKE_LD_FLAGS+=( -L"$LIBCXX_STAGE2/lib" )
@@ -157,10 +187,10 @@ EXTRA_CMAKE_ARGS+=( -DLLVM_INCLUDE_DOCS=OFF )
 
 EXTRA_CMAKE_ARGS+=( -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON )
 
-case "$TARGET_TRIPLE" in
-  # aarch64*)
-  #   CMAKE_C_FLAGS+=( -mcpu=apple-m1 )
-  #   ;;
+case "$TARGET" in
+  aarch64-macos)
+    CMAKE_C_FLAGS+=( -mcpu=apple-m1 )
+    ;;
   x86_64*)
     # -march=x86-64    CMOV, CMPXCHG8B, FPU, FXSR, MMX, FXSR, SCE, SSE, SSE2
     # -march=x86-64-v2 (close to Nehalem, ~2008) CMPXCHG16B, LAHF-SAHF, POPCNT,
@@ -173,11 +203,11 @@ case "$TARGET_TRIPLE" in
 esac
 
 LLVM_TARGETS_TO_BUILD=()
-TARGET_TRIPLES_STR=${TARGET_TRIPLES[*]}
-[[ "$TARGET_TRIPLES_STR" == *x86* ]] && LLVM_TARGETS_TO_BUILD+=( X86 )
-[[ "$TARGET_TRIPLES_STR" == *aarch64* ]] && LLVM_TARGETS_TO_BUILD+=( AArch64 )
-[[ "$TARGET_TRIPLES_STR" == *riscv* ]] && LLVM_TARGETS_TO_BUILD+=( RISCV )
-[[ "$TARGET_TRIPLES_STR" == *wasm* ]] && LLVM_TARGETS_TO_BUILD+=( WebAssembly )
+SYSROOT_TARGETS_STR=${SYSROOT_TARGETS[*]}
+[[ "$SYSROOT_TARGETS_STR" == *x86* ]] && LLVM_TARGETS_TO_BUILD+=( X86 )
+[[ "$SYSROOT_TARGETS_STR" == *aarch64* ]] && LLVM_TARGETS_TO_BUILD+=( AArch64 )
+[[ "$SYSROOT_TARGETS_STR" == *riscv* ]] && LLVM_TARGETS_TO_BUILD+=( RISCV )
+[[ "$SYSROOT_TARGETS_STR" == *wasm* ]] && LLVM_TARGETS_TO_BUILD+=( WebAssembly )
 
 EXTRA_CMAKE_ARGS+=( -DLLDB_ENABLE_PYTHON=OFF )
 # EXTRA_CMAKE_ARGS+=(
@@ -198,15 +228,24 @@ mkdir -p "$BUILD_DIR"
 _pushd "$BUILD_DIR"
 
 if [ -z "${PB_LLVM_SKIP_CONFIG:-}" ] &&
-   [ ! -f CMakeCache.txt -o "$SELF_SCRIPT" -nt CMakeCache.txt ]
+   [ ! -f configured.ok -o \
+     ! -f build.ninja -o \
+     "$SELF_SCRIPT" -nt configured.ok ]
 then
+  if [ -f configured.ok ]; then
+    echo "configured.ok: 1"; else echo "configured.ok: 0"; fi
+  if [ -f build.ninja ]; then
+    echo "build.ninja: 1"; else echo "build.ninja: 0"; fi
+  if [ "$SELF_SCRIPT" -nt CMakeCache.txt ]; then
+    echo "$SELF_SCRIPT -nt CMakeCache.txt: 1"
+  else echo "$SELF_SCRIPT -nt CMakeCache.txt: 0"; fi
 
 # [hacking] --fresh: re-configure from scratch.
 # This only works for the top-level cmake invocation; does not apply to sub-invocations
 # like builtins or runtimes. For a fresh setup of runtimes or builtins:
-#   rm -rf build-x86_64-unknown-linux-musl/llvm-build/runtimes \
-#          build-x86_64-unknown-linux-musl/llvm-build/projects/runtimes* \
-#          build-x86_64-unknown-linux-musl/llvm-build/projects/builtins*
+#   rm -rf build-target/llvm-x86_64-linux-build/runtimes \
+#          build-target/llvm-x86_64-linux-build/projects/runtimes* \
+#          build-target/llvm-x86_64-linux-build/projects/builtins*
 #
 # EXTRA_CMAKE_ARGS+=( --fresh )
 
@@ -282,6 +321,8 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   \
   "${EXTRA_CMAKE_ARGS[@]:-}"
 
+touch configured.ok
+
 fi
 
 
@@ -295,6 +336,9 @@ if $ENABLE_STATIC_LINKING; then
   done
 fi
 
+if [ -n "${LLVM_STAGE2_ONLY_CONFIGURE:-}" ]; then
+  exit 0
+fi
 
 echo "———————————————————————— build ————————————————————————"
 ninja -j$NCPU distribution ${EXTRA_COMPONENTS[@]:-}

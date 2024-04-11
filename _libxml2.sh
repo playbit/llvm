@@ -4,9 +4,11 @@ _pushd "$LIBXML2_DIR/build"
 rm -f test/icu_parse_test.xml  # no icu
 
 CONFIGURE_ARGS=()
-if [ -n "${CHOST:-}" ]; then
-  CONFIGURE_ARGS+=( --host=$CHOST --build=$CBUILD )
-fi
+
+# if [ "$CHOST" != "$CBUILD" ]; then
+CONFIGURE_ARGS+=( --host=$HOST_TRIPLE --build=$(_clang_triple $TARGET) )
+# fi
+
 if [ -n "${SYSROOT:-}" ]; then
   CONFIGURE_ARGS+=( --with-sysroot=$SYSROOT )
 fi

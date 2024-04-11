@@ -181,10 +181,12 @@ ninja -j$NCPU \
   install-llvm-tblgen-stripped \
   install-llvm-libraries-stripped \
   install-llvm-headers \
+  install-llvm-libtool-darwin-stripped \
   install-cxxabi-stripped
 
 cp -av bin/clang-tblgen "$LLVM_STAGE1_DIR/bin/clang-tblgen"
 ln -fsv llvm-objcopy "$LLVM_STAGE1_DIR/bin/llvm-strip"
+ln -fsv llvm-libtool-darwin "$LLVM_STAGE1_DIR/bin/libtool"
 
 if [ "$HOST_SYS" = "linux" ]; then
   # [linux] Sometimes(??) the rtlibs are installed at lib instead of lib/linux

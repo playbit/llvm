@@ -1,0 +1,16 @@
+diff --git a/clang/lib/Driver/ToolChains/WebAssembly.cpp b/clang/lib/Driver/ToolChains/WebAssembly.cpp
+index 36bed3166..ff4374dbb 100644
+--- a/clang/lib/Driver/ToolChains/WebAssembly.cpp
++++ b/clang/lib/Driver/ToolChains/WebAssembly.cpp
+@@ -51,7 +51,10 @@ std::string wasm::Linker::getLinkerPath(const ArgList &Args) const {
+     }
+   }
+ 
+-  return ToolChain.GetProgramPath(ToolChain.getDefaultLinker());
++  const char *defaultLinker = ToolChain.getDefaultLinker();
++  if (llvm::sys::path::is_absolute(defaultLinker))
++    return defaultLinker;
++  return ToolChain.GetProgramPath(defaultLinker);
+ }
+ 
+ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
