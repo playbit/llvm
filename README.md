@@ -2,11 +2,20 @@ llvm for Playbit
 
 ## Packages
 
-    llvm-VERSION-toolchain-HOST      clang, lld et al for running on HOST
-    llvm-VERSION-compiler-rt-TARGET  clang builtins, sanitizers etc for TARGET
-    llvm-VERSION-libcxx-TARGET       libc++, libc++abi and libunwind for TARGET
-    llvm-VERSION-sysroot-TARGET      libc and system headers for TARGET
+The different packages are named symbolically:
 
+- "toolchain" contains compiler & linker for the host platform
+- "compiler-rt" contains compiler builtins & sanitizers for a target platform
+- "sysroot" contains system headers & libraries for a target platform
+- "libcxx" contains libc++ headers & libraries for a target platform
+- "llvmdev" contains llvm headers & libraries for a target platform (you don't need this)
+
+```
+llvm-VERSION-toolchain-HOST      clang, lld et al for running on HOST
+llvm-VERSION-compiler-rt-TARGET  clang builtins, sanitizers etc for TARGET
+llvm-VERSION-libcxx-TARGET       libc++, libc++abi and libunwind for TARGET
+llvm-VERSION-sysroot-TARGET      libc and system headers for TARGET
+```
 
 ## Using
 
@@ -68,17 +77,6 @@ You can list available pre-built LLVM components using tools/webfiles:
 > Note: If you are getting an error "./hello: not found" it is probably because
 > the dynamic linker `/lib/ld.so.1` can't be found (it changed March 10 2024.)
 > Workaround: compile with `-static` or `-Wl,--dynamic-linker=/lib/ld-musl-aarch64.so.1`
-
-
-## Packages
-
-The different packages are named symbolically:
-
-- "toolchain" contains compiler & linker for the host platform
-- "compiler-rt" contains compiler builtins & sanitizers for a target platform
-- "sysroot" contains system headers & libraries for a target platform
-- "libcxx" contains libc++ headers & libraries for a target platform
-- "llvmdev" contains llvm headers & libraries for a target platform (you don't need this)
 
 
 ## Directory structure
