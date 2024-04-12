@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eo pipefail
+
+LLVM_VERSION=${LLVM_VERSION:-17.0.3}
+DESTDIR=${DESTDIR:-$HOME/llvm}
+NATIVE_TARGET=$(uname -m)-playbit
+TARGETS=${TARGETS:-aarch64-playbit x86_64-playbit wasm32-playbit}
+NOW=$(date -u +%Y%m%d%H%M%S)
+
+_add() {
+  local URL="http://files.playb.it/llvm-$LLVM_VERSION-$1.tar.xz?$NOW"
+  echo "extract $URL"
+  wget -q -O- "$URL" | tar -xJ
+}
+
+mkdir -p "$DESTDIR"
+echo "cd $DESTDIR"
+cd "$DESTDIR"
+
+_add toolchain-$NATIVE_TARGET
+
+TARGETS="$TARGETS $NATIVE_TARGET"
+for TARGET in $(echo $TARGETS | tr ' ' '\n' | sort -u); do
+  _add compiler-rt-$TARGET
+  _add libcxx-$TARGET
+  _add sysroot-$TARGET
+done
