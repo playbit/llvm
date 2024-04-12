@@ -1,12 +1,31 @@
-llvm tools for Playbit (clang, lld, ar, objdump, etc)
+llvm for Playbit
+
+## Packages
+
+    llvm-VERSION-toolchain-HOST      clang, lld et al for running on HOST
+    llvm-VERSION-compiler-rt-TARGET  clang builtins, sanitizers etc for TARGET
+    llvm-VERSION-libcxx-TARGET       libc++, libc++abi and libunwind for TARGET
+    llvm-VERSION-sysroot-TARGET      libc and system headers for TARGET
+
 
 ## Using
 
-Use a pre-built version that matches your cpu architecture (`uname -m`):
+Use a pre-built version for your host system and install packages for whatever targets
+you want to build for:
 
 ```shell
-$ wget http://files.playb.it/playbit-sdk-aarch64-20240312015803.tar.xz
-$ mkdir sdk && tar -C sdk -xf playbit-sdk-aarch64-20240312015803.tar.xz
+$ mkdir sdk
+$ _add() { wget -O- http://files.playb.it/llvm-17.0.3-$1.tar.xz | tar -C sdk -x; }
+$ _add toolchain-$(uname -m)-playbit
+$ _add compiler-rt-aarch64-linux
+$ _add compiler-rt-x86_64-linux
+$ _add compiler-rt-wasm32-wasi
+$ _add libcxx-aarch64-linux
+$ _add libcxx-x86_64-linux
+$ _add libcxx-wasm32-wasi
+$ _add sysroot-aarch64-playbit
+$ _add sysroot-x86_64-playbit
+$ _add sysroot-wasm32-playbit
 ```
 
 Build an example program:
@@ -74,8 +93,10 @@ sdk/
 
 ## Building
 
+See `./build.sh -h` for options.
+
+To build everything, run `build.sh` without arguments:
+
 ```shell
 $ ./build.sh
 ```
-
-Note: Only tested build host is macOS 10.15 x86_64

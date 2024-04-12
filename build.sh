@@ -25,8 +25,6 @@ LLVM_SHA256=be5a1e44d64f306bb44fce7d36e3b3993694e8e6122b2348608906283c176db8
 LLVM_URL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VERSION/llvm-project-$LLVM_VERSION.src.tar.xz
 LLVM_PATCHDIR=$PWD/patches-llvm
 
-LLVMSDK_VERSION=${LLVM_VERSION}+1  # reset when changing LLVM_VERSION
-
 MUSL_VERSION=1.2.4
 MUSL_SHA256=99c40dbc9637b66cc3257bcf90decf376053f192440c2a3463a478793cc4397f
 MUSL_URL=https://git.musl-libc.org/cgit/musl/snapshot/v$MUSL_VERSION.tar.gz
@@ -53,6 +51,10 @@ LIBXML2_VERSION=2.11.5
 LIBXML2_SHA256=3727b078c360ec69fa869de14bd6f75d7ee8d36987b071e6928d4720a28df3a6
 LIBXML2_URL=https://download.gnome.org/sources/libxml2/${LIBXML2_VERSION%.*}/libxml2-$LIBXML2_VERSION.tar.xz
 
+BINARYEN_VERSION=117
+BINARYEN_SHA256=9acf7cc5be94bcd16bebfb93a1f5ac6be10e0995a33e1981dd7c404dafe83387
+BINARYEN_URL=https://github.com/WebAssembly/binaryen/archive/refs/tags/version_$BINARYEN_VERSION.tar.gz
+
 HOST_ARCH=$(uname -m)
 HOST_ARCH=${HOST_ARCH/arm64/aarch64}
 HOST_SYS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -66,6 +68,19 @@ NO_PACKAGE=false
 NO_CLEANUP=false
 ONLY_TOOLCHAIN_TARGETS=()
 
+XZ_COMPRESSION_RATIO=8 # 0-9 (xz default is 6)
+# XZ_COMPRESSION_RATIO for toolchain-aarch64-macos on an M1 MacBook:
+#   0  61.9 MB  1.3s
+#   1  58.6 MB  1.8s
+#   2  57.2 MB  2.8s
+#   3  56.2 MB  4.9s
+#   4  53.3 MB  7.5s
+#   5  48.5 MB  11.1s
+#   6  47.9 MB  10.4s
+#   7  43.3 MB  17.4s
+#   8  39.2 MB  29.5s
+#   9  36.9 MB  55.2s
+
 
 # parse command line arguments
 while [[ $# -gt 0 ]]; do case "$1" in
@@ -77,6 +92,7 @@ options:
   --no-lto        Disable LTO
   --no-package    Don't create package of final product (useful when debugging)
   --no-cleanup    Don't remove temporary build directories after successful builds
+  --compress=<r>  Use this xz compression ratio [0-9] for packages (default: $XZ_COMPRESSION_RATIO)
   --rebuild-llvm  Incrementally (re)build llvm stage 2 even if it's up to date
   -v              Verbose logging
   -h, --help      Show help and exit
@@ -90,6 +106,7 @@ _HELP_
   --no-package) NO_PACKAGE=true; shift ;;
   --no-cleanup) NO_CLEANUP=true; shift ;;
   --rebuild-llvm) REBUILD_LLVM=true; shift ;;
+  --compress=*) XZ_COMPRESSION_RATIO=${1:11}; shift;;
   -v) VERBOSE=true; shift ;;
   -*) _err "unknown option $1 (see $0 -help)" ;;
   *) ONLY_TOOLCHAIN_TARGETS+=( $1 ); shift;;
@@ -369,14 +386,15 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
   LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
 
-  CFLAGS=$CFLAGS_NOLTO
-
   # libc++
   LIBCXX_DIR=$BUILD_DIR/libcxx
   _run_if_missing "$LIBCXX_DIR/lib/libc++.a" _libcxx.sh
   echo "Using libc++.a at ${LIBCXX_DIR##$PWD0/}"
   CFLAGS="$CFLAGS -I$LIBCXX_DIR/include/c++/v1 -I$LIBCXX_DIR/include"
   LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib"
+
+  # disable LTO for compiler-rt
+  CFLAGS=$CFLAGS_NOLTO
 
   # compiler-rt (excluding builtins, which we built earlier)
   # compiler-rt's cmake setup requires a configured general LLVM, so we need
@@ -428,6 +446,9 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   LIBCXX_DIR=$BUILD_DIR/libcxx
   COMPILER_RT_DIR=$BUILD_DIR/compiler-rt
 
+  CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
+  LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
+
   # zlib
   ZLIB_DIR=$BUILD_DIR/zlib
   _run_if_missing "$ZLIB_DIR/lib/libz.a" _zlib.sh
@@ -447,29 +468,16 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   LLVM_STAGE2_DIR=$BUILD_DIR/llvm
   _run_if_missing "$LLVM_STAGE2_DIR/bin/clang" _llvm-stage2.sh
   echo "Using llvm-stage2 at ${LLVM_STAGE2_DIR##$PWD0/}/"
+
+  # binaryen
+  BINARYEN_DIR=$BUILD_DIR/binaryen
+  _run_if_missing "$BINARYEN_DIR/bin/wasm-opt" _binaryen.sh
+  echo "Using binaryen at ${BINARYEN_DIR##$PWD0/}/"
 done
 CFLAGS=$BASE_CFLAGS
 LDFLAGS=$BASE_LDFLAGS
 
 [ -n "${PB_LLVM_STOP_AFTER_BUILD:-}" ] && exit 0
-
-# # —————————————————————————————————————————————————————————————————————————————
-# # build compiler runtimes (e.g. sanitizers) for every TARGET
-# # Note: we built libclang_rt.builtins.a earlier
-# echo "~~~~~~~~~~~~~~~~~~~~ compiler-rt ~~~~~~~~~~~~~~~~~~~~"
-# for TARGET in ${SYSROOT_TARGETS[@]}; do
-#   [[ $TARGET == wasm* ]] && continue
-#   _setenv_for_target $TARGET
-#   LIBCXX_DIR=$BUILD_DIR/libcxx
-#   COMPILER_RT_DIR=$BUILD_DIR/compiler-rt
-#   BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
-#   case $TARGET in
-#     *macos) CANARY="$COMPILER_RT_DIR/lib/libclang_rt.asan_abi_osx.a" ;;
-#     *)      CANARY="$COMPILER_RT_DIR/lib/libclang_rt.asan.a" ;;
-#   esac
-#   _run_if_missing "$CANARY" _compiler-rt.sh "compiler-rt $TARGET"
-#   echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/lib/"
-# done
 
 # ——————————————————————————————————————————————————————————————————————————————
 # step 3: package
@@ -477,82 +485,128 @@ if $NO_PACKAGE; then
   exit 0
 fi
 
+_cpmerge() {
+  echo "copy <projectroot>/${1##$PWD0/} -> $2"
+  $TOOLS/cpmerge -v "$@" >> "$BUILD_DIR/package-$PKGNAME.log"
+}
+
+_create_package() { # <package-name> <script>
+  local PKGNAME=$1
+  local SCRIPT=$PWD/$2
+
+  _setenv_for_target $TARGET
+
+  BUILTINS_DIR=$BUILD_DIR/builtins
+  COMPILER_RT_DIR=$BUILD_DIR/$PKGNAME
+  LIBCXX_DIR=$BUILD_DIR/libcxx
+  LLVM_STAGE2_DIR=$BUILD_DIR/llvm
+  ZLIB_DIR=$BUILD_DIR/zlib
+  ZSTD_DIR=$BUILD_DIR/zstd
+  LIBXML2_DIR=$BUILD_DIR/libxml2
+  BINARYEN_DIR=$BUILD_DIR/binaryen
+
+  PACKAGE_TARGET=$TARGET
+  PACKAGE_DIR=$PACKAGE_DIR_BASE/$PKGNAME-$PACKAGE_TARGET
+  PACKAGE_ARCHIVE=$PACKAGE_DIR_BASE/llvm-$LLVM_VERSION-$PKGNAME-$PACKAGE_TARGET.tar.xz
+
+  echo "~~~~~~~~~~~~~~~~~~~~ package $PKGNAME-$PACKAGE_TARGET ~~~~~~~~~~~~~~~~~~~~"
+  rm -f "$BUILD_DIR/package-$PKGNAME.log"
+
+  rm -rf "$PACKAGE_DIR"
+  mkdir -p "$PACKAGE_DIR"
+  _pushd "$PACKAGE_DIR"
+
+  if [ $PKGNAME != toolchain ]; then
+    # for all packages but toolchain, prefix with sysroot/SYS/ARCH (included in tar)
+    local arch sys
+    IFS=- read -r arch sys <<< "$TARGET"
+    mkdir -p sysroot/$sys/$arch
+    _pushd sysroot/$sys/$arch
+  fi
+
+  source "$SCRIPT"
+
+  # remove empty directories
+  find . -type d -empty -delete
+
+  if [ $PKGNAME != toolchain ]; then
+    _popd
+  fi
+
+  echo "Creating ${PACKAGE_ARCHIVE##$PWD0/}"
+  tar -c . | xz --compress -F xz -$XZ_COMPRESSION_RATIO \
+                --stdout --threads=0 \
+           > "$PACKAGE_ARCHIVE"
+}
+
+# make sure cpmerge is available
 tools/build.sh
 TOOLS=$PWD/tools
 export TOOLS
-XZ_COMPRESSION_RATIO=9
-# XZ_COMPRESSION_RATIO=2
 
 for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
-  _setenv_for_target $TARGET
-  LLVM_STAGE2_DIR=$BUILD_DIR/llvm
-  PACKAGE_DIR=$PACKAGE_DIR_BASE/toolchain-$TARGET
-  PACKAGE_ARCHIVE=$PACKAGE_DIR_BASE/llvmsdk-$LLVMSDK_VERSION-toolchain-$TARGET.tar.xz
-  echo "~~~~~~~~~~~~~~~~~~~~ package toolchain $TARGET ~~~~~~~~~~~~~~~~~~~~"
-  ( source _package-toolchain.sh )
+  (_create_package toolchain _package-toolchain.sh)
+  (_create_package llvmdev _package-llvmdev.sh)
 done
-
-# for TARGET in aarch64-playbit wasm32-playbit; do
 for TARGET in ${SYSROOT_TARGETS[@]}; do
-  _setenv_for_target $TARGET
-  BUILTINS_DIR=$BUILD_DIR/builtins
-  LIBCXX_DIR=$BUILD_DIR/libcxx
-  COMPILER_RT_DIR=$BUILD_DIR/compiler-rt
-  PACKAGE_DIR=$PACKAGE_DIR_BASE/sysroot-$TARGET
-  PACKAGE_ARCHIVE=$PACKAGE_DIR_BASE/llvmsdk-$LLVMSDK_VERSION-sysroot-$TARGET.tar.xz
-  echo "~~~~~~~~~~~~~~~~~~~~ package sysroot $TARGET ~~~~~~~~~~~~~~~~~~~~"
-  ( source _package-sysroot.sh )
+  (_create_package compiler-rt _package-compiler-rt.sh)
+  (_create_package libcxx _package-libcxx.sh)
+  (_create_package sysroot _package-sysroot.sh)
 done
-
-# for TARGET in ${SYSROOT_TARGETS[@]}; do
-#   _setenv_for_target $TARGET
-#   ZLIB_DIR=$BUILD_DIR/zlib
-#   ZSTD_DIR=$BUILD_DIR/zstd
-#   LIBXML2_DIR=$BUILD_DIR/libxml2
-#   LLVM_STAGE2_DIR=$BUILD_DIR/llvm
-#   PACKAGE_DIR=$PACKAGE_DIR_BASE/llvmdev-$TARGET
-#   PACKAGE_ARCHIVE=$PACKAGE_DIR_BASE/llvmsdk-$LLVMSDK_VERSION-llvmdev-$TARGET.tar.xz
-#   echo "~~~~~~~~~~~~~~~~~~~~ package llvmdev $TARGET ~~~~~~~~~~~~~~~~~~~~"
-#   ( source _package-llvmdev.sh )
-# done
 
 # create local test dir for native toolchain
 NATIVE_TOOLCHAIN=
 for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   [ $TARGET = "$HOST_ARCH-$HOST_SYS" ] || continue
   echo "~~~~~~~~~~~~~~~~~~~~ setup native toolchain ~~~~~~~~~~~~~~~~~~~~"
+  unset _cpmerge
+  _cpmerge() {
+    echo "cpmerge ${1##$PWD0/} -> ${2##$PWD0/}"
+    $TOOLS/cpmerge "$@"
+  }
   TOOLS_DIR=$PACKAGE_DIR_BASE/toolchain-$TARGET
   NATIVE_TOOLCHAIN=$PACKAGE_DIR_BASE/toolchain
   rm -rf "$NATIVE_TOOLCHAIN"
   echo "copy ${TOOLS_DIR##$PWD0/}/ -> ${NATIVE_TOOLCHAIN##$PWD0/}/"
   cp -a "$TOOLS_DIR" "$NATIVE_TOOLCHAIN"
-  mkdir "$NATIVE_TOOLCHAIN/sysroot"
   for TARGET in ${SYSROOT_TARGETS[@]}; do
     IFS=- read -r arch platform <<< "$TARGET"
-    mkdir -p "$NATIVE_TOOLCHAIN/sysroot/$platform"
-    _symlink "$NATIVE_TOOLCHAIN/sysroot/$platform/$arch" ../../../sysroot-$TARGET
+    SUFFIX=/sysroot/$platform/$arch
+    DSTDIR=$NATIVE_TOOLCHAIN$SUFFIX
+    mkdir -p "$DSTDIR"
+    # note: must copy sysroot first since macos sysroot contains symlinks to usr
+    _cpmerge $PACKAGE_DIR_BASE/sysroot-$TARGET$SUFFIX     "$DSTDIR"
+    _cpmerge $PACKAGE_DIR_BASE/compiler-rt-$TARGET$SUFFIX "$DSTDIR"
+    _cpmerge $PACKAGE_DIR_BASE/libcxx-$TARGET$SUFFIX      "$DSTDIR"
   done
 done
 
 # test native toolchain
 if [ -n "$NATIVE_TOOLCHAIN" ]; then
   echo "~~~~~~~~~~~~~~~~~~~~ test native toolchain ~~~~~~~~~~~~~~~~~~~~"
+  _test_cc() {
+    echo "${NATIVE_TOOLCHAIN##$PWD0/}/bin/clang $@"
+    "$NATIVE_TOOLCHAIN/bin/clang" "$@"
+  }
+  _test_cxx() {
+    echo "${NATIVE_TOOLCHAIN##$PWD0/}/bin/clang++ $@"
+    "$NATIVE_TOOLCHAIN/bin/clang++" "$@"
+  }
   for TARGET in ${SYSROOT_TARGETS[@]}; do
     case $TARGET in
       *playbit) CC_TRIPLE=$TARGET;;
       *)        CC_TRIPLE=$(_clang_triple $TARGET);;
     esac
-    set -x
-    "$NATIVE_TOOLCHAIN/bin/clang" --target=$CC_TRIPLE hello.c -o hello_c_$TARGET
-    "$NATIVE_TOOLCHAIN/bin/clang++" --target=$CC_TRIPLE hello.cc -o hello_cc_$TARGET
+    _test_cc --target=$CC_TRIPLE hello.c -o hello_c_$TARGET
+    _test_cxx --target=$CC_TRIPLE hello.cc -o hello_cc_$TARGET
     set +x
   done
 fi
 
 #TAG=$(date -u +%Y%m%d%H%M%S)
 echo
-echo "You can upload the archives to files.playb.it like this:"
-for f in $PACKAGE_DIR_BASE/llvmsdk-$LLVMSDK_VERSION-*.tar.xz; do
-  UPLOAD_PATH=$(basename "$f")
-  echo "  webfiles cp -v --sha256 ${f##$PWD0/} $UPLOAD_PATH"
-done
+echo "You can upload the archives to files.playb.it: ./upload-packages.sh"
+# for f in $PACKAGE_DIR_BASE/llvm-$LLVM_VERSION-*.tar.xz; do
+#   UPLOAD_PATH=$(basename "$f")
+#   echo "  webfiles cp -v --sha256 ${f##$PWD0/} $UPLOAD_PATH"
+# done
