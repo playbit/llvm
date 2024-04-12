@@ -11,11 +11,11 @@ llvm for Playbit
 ## Using
 
 Use a pre-built version for your host system and install packages for whatever targets
-you want to build for:
+you want to build for: (or use the `llvm-install` helper script)
 
 ```shell
-$ mkdir sdk
-$ _add() { wget -O- http://files.playb.it/llvm-17.0.3-$1.tar.xz | tar -C sdk -x; }
+$ mkdir llvm && cd llvm
+$ _add() { wget -q -O- http://files.playb.it/llvm-17.0.3-$1.tar.xz | tar -x; }
 $ _add toolchain-$(uname -m)-playbit
 $ _add compiler-rt-aarch64-linux
 $ _add compiler-rt-x86_64-linux
@@ -38,60 +38,59 @@ int main(int argc, char* argv[]) {
   return 0;
 }
 END
-$ sdk/bin/clang hello.c -o hello
+$ bin/clang hello.c -o hello
 $ ./hello
 hello from C program ./hello
 ```
 
-Note: If you are getting an error "./hello: not found" it is probably because
-the dynamic linker `/lib/ld.so.1` can't be found (it was recently added, March 10, 2024.)
-Workaround for this is either: a) build & use a new playbit-system.qcow2 image, or compile with `-static` to embed libc at compile time.
-
 Build for another architecture by setting `--target`:
 
 ```shell
-$ sdk/bin/clang hello.c -o hello.a64 --target=aarch64-playbit
-$ sdk/bin/clang hello.c -o hello.x86 --target=x86_64-playbit
-$ sdk/bin/clang hello.c -o hello.wasm --target=wasm32-playbit
+$ bin/clang hello.c -o hello.a64 --target=aarch64-playbit
+$ bin/clang hello.c -o hello.x86 --target=x86_64-playbit
+$ bin/clang hello.c -o hello.wasm --target=wasm32-playbit
 ```
 
 Let's verify that it worked:
 
 ```shell
 $ for f in hello.a64 hello.x86; do \
-sdk/bin/readelf --file-header $f | grep Machine; done
+bin/readelf --file-header $f | grep Machine; done
   Machine:                           AArch64
   Machine:                           Advanced Micro Devices X86-64
 $ head -c4 hello.wasm | hexdump -c
 0000000  \0   a   s   m
 ```
 
-To list available pre-built versions of the SDK, use tools/webfiles:
+You can list available pre-built LLVM components using tools/webfiles:
+`tools/webfiles ls llvm-17.0.3-`
 
-```shell
-$ tools/webfiles ls playbit-sdk-
-2024-03-10 15:16:02   65 Bytes playbit-sdk-aarch64-20240312015803.tar.xz.sha256
-2024-03-10 15:16:00   67.0 MiB playbit-sdk-aarch64-20240312015803.tar.xz
-2024-03-10 15:16:21   65 Bytes playbit-sdk-x86_64-20240312015803.tar.xz.sha256
-2024-03-10 15:16:19   70.9 MiB playbit-sdk-x86_64-20240312015803.tar.xz
+> Note: If you are getting an error "./hello: not found" it is probably because
+> the dynamic linker `/lib/ld.so.1` can't be found (it changed March 10 2024.)
+> Workaround: compile with `-static` or `-Wl,--dynamic-linker=/lib/ld-musl-aarch64.so.1`
+
+
+## Packages
+
+The different packages are named symbolically:
+
+- "toolchain" contains compiler & linker for the host platform
+- "compiler-rt" contains compiler builtins & sanitizers for a target platform
+- "sysroot" contains system headers & libraries for a target platform
+- "libcxx" contains libc++ headers & libraries for a target platform
+- "llvmdev" contains llvm headers & libraries for a target platform (you don't need this)
+
+
+## Directory structure
+
+```
+bin/                -- clang, ld.lld et al (from "toolchain")
+lib/clang/include/  -- compiler headers (stdint.h etc, from "toolchain")
+sysroot/SYSTEM/ARCH -- headers & libraries for ARCH-playbit target
 ```
 
 
-## Layout
-
-Each "SDK" contains compiler, linker and tools for the host architecture, plus a complete set of headers & libraries for every target architecture.
-
-```
-sdk/
-  bin/                -- clang, ld.lld et al
-  lib/clang/include/  -- target-agnostic compiler headers (stdint.h etc)
-  lib/clang/lib/      -- target-specific compiler libraries (builtins.a etc)
-  sysroot-generic/    -- headers & libraries for all *-playbit targets
-  sysroot-ARCH/       -- headers & libraries for ARCH-playbit target
-```
-
-
-## Building
+## Building from source
 
 See `./build.sh -h` for options.
 
