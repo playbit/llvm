@@ -25,7 +25,7 @@ CFLAGS="$CFLAGS -fno-lto" \
   --bindir=/bin \
   --libdir=/lib \
   --syslibdir=/lib \
-  --includedir=/include \
+  --includedir=/usr/include \
   --mandir=/share/man \
   --infodir=/share/info \
   --localstatedir=/var \
@@ -37,12 +37,12 @@ if $ENABLE_EXECINFO; then
   make DESTDIR=install1 install-headers
   echo "CC libexecinfo_stacktraverse.o"
   $CC $CFLAGS -O2 -fno-strict-aliasing -fstack-protector \
-    -Iinstall1/include \
+    -Iinstall1/usr/include \
     -c "$MUSL_PATCHDIR/libexecinfo/stacktraverse.c" \
     -o libexecinfo_stacktraverse.o
   echo "CC libexecinfo_execinfo.o"
   $CC $CFLAGS -O2 -fno-strict-aliasing -fstack-protector \
-    -Iinstall1/include \
+    -Iinstall1/usr/include \
     -c "$MUSL_PATCHDIR/libexecinfo/execinfo.c" \
     -o libexecinfo_execinfo.o
   # patch makefile
@@ -82,14 +82,14 @@ mv "$SYSROOT/lib/libc.so" "$SYSROOT/lib/libc-TEMPORARILY_RENAMED.so"
 # Installs a few BSD compatibility headers
 # (cdefs, queue, tree; known as bsd-compat-headers in alpine)
 cd "$MUSL_PATCHDIR"
-mkdir -p "$SYSROOT/include/sys"
-install -v -m0644 sys-cdefs.h "$SYSROOT/include/sys/cdefs.h"
-install -v -m0644 sys-queue.h "$SYSROOT/include/sys/queue.h"
-install -v -m0644 sys-tree.h  "$SYSROOT/include/sys/tree.h"
+mkdir -p "$SYSROOT/usr/include/sys"
+install -v -m0644 sys-cdefs.h "$SYSROOT/usr/include/sys/cdefs.h"
+install -v -m0644 sys-queue.h "$SYSROOT/usr/include/sys/queue.h"
+install -v -m0644 sys-tree.h  "$SYSROOT/usr/include/sys/tree.h"
 
 # install execinfo.h
 install -v -m0644 \
   "$MUSL_PATCHDIR/libexecinfo/execinfo.h" \
-  "$SYSROOT/include/execinfo.h"
+  "$SYSROOT/usr/include/execinfo.h"
 
 $NO_CLEANUP || rm -rf "$MUSL_BUILD_DIR"

@@ -29,7 +29,7 @@ for f in \
   rm -rf "$SYSROOT/usr/include/$f"
 done
 
-for dir in bin lib include; do
+for dir in bin lib; do
   ln -s usr/$dir "$SYSROOT/$dir"
 done
 

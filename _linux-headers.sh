@@ -11,8 +11,8 @@ case "$TARGET" in
 esac
 
 for dir in ${SRCDIRS[@]}; do
-  echo "cpmerge $dir/include -> ${SYSROOT##$PWD0/}/include"
-  if ! tools/cpmerge -v -f $dir/include $SYSROOT/include >> "$LOGFILE"; then
+  echo "cpmerge $dir/include -> ${SYSROOT##$PWD0/}/usr/include"
+  if ! tools/cpmerge -v -f $dir/include $SYSROOT/usr/include >> "$LOGFILE"; then
     cat "$LOGFILE" >&2
     exit 1
   fi

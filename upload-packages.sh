@@ -19,10 +19,11 @@ _HELP_
   *) _err "unexpected argument $1 (see $0 -help)" ;;
 esac; done
 
+WFCP_ARGS=( -v --sha256 --expires=2024-01-01T00:00:00Z --cache-control=max-age=60 )
 for f in packages/llvm-$LLVM_VERSION-*.tar.xz; do
   if $DRYRUN; then
-    echo "[dryrun] webfiles cp -v --sha256 '${f##$PWD0/}' '$(basename "$f")'"
+    echo "[dryrun] webfiles cp ${WFCP_ARGS[@]} '${f##$PWD0/}' '$(basename "$f")'"
   else
-    ../playbit/tools/webfiles cp -v --sha256 "${f##$PWD0/}" "$(basename "$f")"
+    ../playbit/tools/webfiles cp "${WFCP_ARGS[@]}" "${f##$PWD0/}" "$(basename "$f")"
   fi
 done

@@ -11,7 +11,7 @@ make -j$NCPU \
   AR=$LLVM_STAGE1_DIR/bin/llvm-ar \
   NM=$LLVM_STAGE1_DIR/bin/llvm-nm \
   SYSROOT_LIB=$PWD/sysroot/lib \
-  SYSROOT_INC=$PWD/sysroot/include \
+  SYSROOT_INC=$PWD/sysroot/usr/include \
   SYSROOT_SHARE=$PWD/sysroot/share \
   SYSROOT=$PWD/sysroot
 

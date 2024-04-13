@@ -218,7 +218,7 @@ LIBCXX_OBJECTS=()
 CXXFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS ${GENERIC_CXXFLAGS[@]}"
 CXXFLAGS="$CXXFLAGS -I$(dirname $config_site) ${GENERIC_CXXFLAGS[@]}"
-CXXFLAGS="$CXXFLAGS -isystem$SYSROOT/include"
+CXXFLAGS="$CXXFLAGS -isystem$SYSROOT/usr/include"
 CXXFLAGS="$CXXFLAGS -isystem$S1_CLANGRES_DIR/include"
 CXXFLAGS="$CXXFLAGS ${GENERIC_CFLAGS[@]}"
 CFLAGS="$CFLAGS ${GENERIC_CFLAGS[@]}"
@@ -287,20 +287,20 @@ done
 
 
 # install
-rm -rf "$DESTDIR/include"
-mkdir -p "$DESTDIR/include/c++"
-echo "copydir: ${LIBCXX##$PWD0/}/include -> ${DESTDIR##$PWD0/}/include/c++/v1"
-cp -a $LIBCXX/include "$DESTDIR/include/c++/v1"
+rm -rf "$DESTDIR/usr/include"
+mkdir -p "$DESTDIR/usr/include/c++"
+echo "copydir: ${LIBCXX##$PWD0/}/include -> ${DESTDIR##$PWD0/}/usr/include/c++/v1"
+cp -a $LIBCXX/include "$DESTDIR/usr/include/c++/v1"
 
-install -v -m0644 "$LIBCXXABI"/include/*.h "$DESTDIR/include/c++/v1"
+install -v -m0644 "$LIBCXXABI"/include/*.h "$DESTDIR/usr/include/c++/v1"
 
-install -v -m0644 $config_site "$DESTDIR/include/c++/v1/__config_site"
+install -v -m0644 $config_site "$DESTDIR/usr/include/c++/v1/__config_site"
 
-install -v -m0644 "$LIBUNWIND/include/__libunwind_config.h" "$DESTDIR/include"
-install -v -m0644 "$LIBUNWIND/include/libunwind.h"          "$DESTDIR/include"
-install -v -m0644 "$LIBUNWIND/include/unwind.h"             "$DESTDIR/include"
-install -v -m0644 "$LIBUNWIND/include/unwind_arm_ehabi.h"   "$DESTDIR/include"
-install -v -m0644 "$LIBUNWIND/include/unwind_itanium.h"     "$DESTDIR/include"
+install -v -m0644 "$LIBUNWIND/include/__libunwind_config.h" "$DESTDIR/usr/include"
+install -v -m0644 "$LIBUNWIND/include/libunwind.h"          "$DESTDIR/usr/include"
+install -v -m0644 "$LIBUNWIND/include/unwind.h"             "$DESTDIR/usr/include"
+install -v -m0644 "$LIBUNWIND/include/unwind_arm_ehabi.h"   "$DESTDIR/usr/include"
+install -v -m0644 "$LIBUNWIND/include/unwind_itanium.h"     "$DESTDIR/usr/include"
 
 mkdir -p "$DESTDIR/lib"
 for lib in ${libs[@]}; do
@@ -308,7 +308,7 @@ for lib in ${libs[@]}; do
   mv $lib.a "$DESTDIR/lib/$lib.a"
 done
 
-find "$DESTDIR/include" \( -name '.*' -o -name '*.txt' -o -name '*.in' \) -delete
+find "$DESTDIR/usr/include" \( -name '.*' -o -name '*.txt' -o -name '*.in' \) -delete
 
 cd "$DESTDIR"
 $NO_CLEANUP || rm -rf "$BUILDDIR"

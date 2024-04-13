@@ -53,9 +53,9 @@ CMAKE_C_FLAGS=(
   -Wno-unused-command-line-argument \
 )
 CMAKE_CXX_FLAGS=(
-  "-I$LIBCXX_DIR/include/c++/v1" \
-  "-I$LIBCXX_DIR/include" \
-  "-isystem$SYSROOT/include" \
+  "-I$LIBCXX_DIR/usr/include/c++/v1" \
+  "-I$LIBCXX_DIR/usr/include" \
+  "-isystem$SYSROOT/usr/include" \
 )
 CMAKE_LD_FLAGS=(
   $LDFLAGS \

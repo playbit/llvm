@@ -365,14 +365,14 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   # libc and system headers
   case "$TARGET" in
   *wasi|wasm*playbit)
-    _run_if_missing "$SYSROOT/include/stdlib.h" _wasi.sh
+    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _wasi.sh
     ;;
   *linux|*playbit)
-    _run_if_missing "$SYSROOT/include/linux/version.h" _linux-headers.sh
-    _run_if_missing "$SYSROOT/include/stdlib.h" _musl.sh
+    _run_if_missing "$SYSROOT/usr/include/linux/version.h" _linux-headers.sh
+    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _musl.sh
     ;;
   *macos)
-    _run_if_missing "$SYSROOT/include/stdlib.h" _macos-sdk.sh
+    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _macos-sdk.sh
     ;;
   esac
 
@@ -390,7 +390,7 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   LIBCXX_DIR=$BUILD_DIR/libcxx
   _run_if_missing "$LIBCXX_DIR/lib/libc++.a" _libcxx.sh
   echo "Using libc++.a at ${LIBCXX_DIR##$PWD0/}"
-  CFLAGS="$CFLAGS -I$LIBCXX_DIR/include/c++/v1 -I$LIBCXX_DIR/include"
+  CFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
   LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib"
 
   # disable LTO for compiler-rt
@@ -520,8 +520,13 @@ _create_package() { # <package-name> <script>
     # for all packages but toolchain, prefix with sysroot/SYS/ARCH (included in tar)
     local arch sys
     IFS=- read -r arch sys <<< "$TARGET"
-    mkdir -p sysroot/$sys/$arch
-    _pushd sysroot/$sys/$arch
+    if [ $sys = playbit ]; then
+      mkdir -p sysroot/$arch
+      _pushd sysroot/$arch
+    else
+      mkdir -p sysroot/$sys/$arch
+      _pushd sysroot/$sys/$arch
+    fi
   fi
 
   source "$SCRIPT"
@@ -544,15 +549,15 @@ tools/build.sh
 TOOLS=$PWD/tools
 export TOOLS
 
-for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
-  (_create_package toolchain _package-toolchain.sh)
-  (_create_package llvmdev _package-llvmdev.sh)
-done
-for TARGET in ${SYSROOT_TARGETS[@]}; do
-  (_create_package compiler-rt _package-compiler-rt.sh)
-  (_create_package libcxx _package-libcxx.sh)
-  (_create_package sysroot _package-sysroot.sh)
-done
+# for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
+#   (_create_package toolchain _package-toolchain.sh)
+#   (_create_package llvmdev _package-llvmdev.sh)
+# done
+# for TARGET in ${SYSROOT_TARGETS[@]}; do
+#   (_create_package compiler-rt _package-compiler-rt.sh)
+#   (_create_package libcxx _package-libcxx.sh)
+#   (_create_package sysroot _package-sysroot.sh)
+# done
 
 # create local test dir for native toolchain
 NATIVE_TOOLCHAIN=
@@ -570,8 +575,12 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   echo "copy ${TOOLS_DIR##$PWD0/}/ -> ${NATIVE_TOOLCHAIN##$PWD0/}/"
   cp -a "$TOOLS_DIR" "$NATIVE_TOOLCHAIN"
   for TARGET in ${SYSROOT_TARGETS[@]}; do
-    IFS=- read -r arch platform <<< "$TARGET"
-    SUFFIX=/sysroot/$platform/$arch
+    IFS=- read -r arch sys <<< "$TARGET"
+    if [ $sys = playbit ]; then
+      SUFFIX=/sysroot/$arch
+    else
+      SUFFIX=/sysroot/$sys/$arch
+    fi
     DSTDIR=$NATIVE_TOOLCHAIN$SUFFIX
     mkdir -p "$DSTDIR"
     # note: must copy sysroot first since macos sysroot contains symlinks to usr

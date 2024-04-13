@@ -314,7 +314,9 @@ Playbit::Playbit(const Driver &D, const llvm::Triple &targetTriple, const ArgLis
 
   // select sysroot dir
   if (D.SysRoot.empty()) {
-    SysRoot = fspath({ sdkDir, "sysroot", "playbit", getTriple().getArchName().str() });
+    SysRoot = fspath({ sdkDir, "sysroot/" + getTriple().getArchName().str() });
+    if (!getVFS().exists(SysRoot))
+      SysRoot = fspath({ sdkDir, "sysroot/playbit/" + getTriple().getArchName().str() });
   } else {
     // user provided explicit --sysroot=
     SysRoot = D.SysRoot;
@@ -426,7 +428,7 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
 
     // add -isystem for sanitizers
     if (!getTriple().isWasm()) {
-      std::string compiler_rt_incdir = fspath({ SysRoot, "lib", "clang", "include" });
+      std::string compiler_rt_incdir = fspath({ SysRoot, "lib/clang/include" });
       addSystemInclude(DriverArgs, CC1Args, compiler_rt_incdir);
     }
   }
@@ -452,7 +454,14 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
   //   return;
   // }
 
-  addExternCSystemInclude(DriverArgs, CC1Args, SysRoot + "/include");
+  std::string incPath = fspath({SysRoot, "usr/include"});
+  if (getVFS().exists(incPath)) {
+    addExternCSystemInclude(DriverArgs, CC1Args, incPath);
+  } else {
+    incPath = fspath({SysRoot, "include"});
+    if (getVFS().exists(incPath))
+      addExternCSystemInclude(DriverArgs, CC1Args, incPath);
+  }
 }
 
 
@@ -462,10 +471,14 @@ void Playbit::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
       DriverArgs.hasArg(options::OPT_nostdincxx))
     return;
 
-  std::string incPath = fspath({SysRoot, "include", "c++", "v1"});
+  std::string incPath = fspath({SysRoot, "usr/include/c++/v1"});
   if (getVFS().exists(incPath)) {
     // SDK headers
     addSystemInclude(DriverArgs, CC1Args, incPath);
+  } else {
+    incPath = fspath({SysRoot, "include/c++/v1"});
+    if (getVFS().exists(incPath))
+      addSystemInclude(DriverArgs, CC1Args, incPath);
   }
 }
 

@@ -58,11 +58,11 @@ CMAKE_C_FLAGS=( \
 # Note: We have to provide search path to sysroot headers after libc++ headers
 # for include_next to function properly. Additionally, we must (later) make sure
 # that CMAKE_CXX_FLAGS preceeds CFLAGS for C++ compilation, so that e.g.
-# include <stdlib.h> loads c++/v1/stdlib.h (and then sysroot/include/stdlib.h)
+# include <stdlib.h> loads c++/v1/stdlib.h (and then sysroot/usr/include/stdlib.h)
 CMAKE_CXX_FLAGS=( \
-  "-I$LIBCXX_DIR/include/c++/v1" \
-  "-I$LIBCXX_DIR/include" \
-  "-isystem$SYSROOT/include" \
+  "-I$LIBCXX_DIR/usr/include/c++/v1" \
+  "-I$LIBCXX_DIR/usr/include" \
+  "-isystem$SYSROOT/usr/include" \
 )
 CMAKE_LD_FLAGS=( $LDFLAGS -L$LIBCXX_DIR/lib -lc++abi )
 # CMAKE_LD_FLAGS=( $LDFLAGS -L$LIBCXX_DIR/lib -lc++ -lc++abi )
@@ -368,7 +368,8 @@ if $ENABLE_LLVM_DEV_FILES; then
   done
 
   # copy lld headers from source (they are not affected by build)
-  cp -av "$LLVM_STAGE2_SRC/lld/include/lld" "$DESTDIR/include/lld"
+  mkdir -p "$DESTDIR/usr/include"
+  cp -av "$LLVM_STAGE2_SRC/lld/include/lld" "$DESTDIR/usr/include/lld"
 fi
 
 # create binutils-compatible symlinks

@@ -19,12 +19,12 @@ CMAKE_ARGS=()
 # CMAKE_ARGS+=( -DLLVM_ENABLE_LTO=Thin ); C_FLAGS+=( -flto=thin )
 # C_FLAGS+=( -fno-lto )
 
-# C_FLAGS+=( -isystem$LIBCXX_DIR/include )
+# C_FLAGS+=( -isystem$LIBCXX_DIR/usr/include )
 C_FLAGS+=( -isystem$S1_CLANGRES_DIR/include )
 CXX_FLAGS+=(
-  "-I$LIBCXX_DIR/include/c++/v1" \
-  "-isystem$SYSROOT/include" \
-  -isystem$LIBCXX_DIR/include \
+  "-I$LIBCXX_DIR/usr/include/c++/v1" \
+  "-isystem$SYSROOT/usr/include" \
+  -isystem$LIBCXX_DIR/usr/include \
   -isystem$S1_CLANGRES_DIR/include \
 )
 
