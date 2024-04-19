@@ -425,12 +425,6 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
     SmallString<128> P(D.ResourceDir);
     llvm::sys::path::append(P, "include");
     addSystemInclude(DriverArgs, CC1Args, P);
-
-    // add -isystem for sanitizers
-    if (!getTriple().isWasm()) {
-      std::string compiler_rt_incdir = fspath({ SysRoot, "lib/clang/include" });
-      addSystemInclude(DriverArgs, CC1Args, compiler_rt_incdir);
-    }
   }
 
   // don't add standard-library search paths if -nostdlibinc is set
@@ -499,7 +493,7 @@ std::string Playbit::getCompilerRT(const ArgList &Args, StringRef Component,
                                    FileType Type) const {
   // printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
   SmallString<128> Path(SysRoot);
-  llvm::sys::path::append(Path, "lib", "clang", "lib");
+  llvm::sys::path::append(Path, "lib/clang/lib");
   const char *Prefix = (Type == ToolChain::FT_Object) ? "" : "lib";
   const char *Suffix;
   switch (Type) {

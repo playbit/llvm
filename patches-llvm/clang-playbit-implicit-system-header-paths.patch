@@ -1,0 +1,20 @@
+diff --git a/clang/lib/Lex/InitHeaderSearch.cpp b/clang/lib/Lex/InitHeaderSearch.cpp
+index 41382d7cb..13f4edccd 100644
+--- a/clang/lib/Lex/InitHeaderSearch.cpp
++++ b/clang/lib/Lex/InitHeaderSearch.cpp
+@@ -234,6 +234,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
+     case llvm::Triple::CloudABI:
+     case llvm::Triple::NaCl:
+     case llvm::Triple::ELFIAMCU:
++    case llvm::Triple::Playbit:
+       break;
+     case llvm::Triple::Win32:
+       if (triple.getEnvironment() != llvm::Triple::Cygnus)
+@@ -336,6 +337,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
+   case llvm::Triple::RTEMS:
+   case llvm::Triple::NaCl:
+   case llvm::Triple::ELFIAMCU:
++  case llvm::Triple::Playbit:
+     break;
+   default:
+     AddPath("/usr/include", ExternCSystem, false);
