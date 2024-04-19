@@ -488,6 +488,8 @@ fi
 _cpmerge() {
   echo "copy <projectroot>/${1##$PWD0/} -> $2"
   $TOOLS/cpmerge -v "$@" >> "$BUILD_DIR/package-$PKGNAME.log"
+  # mkdir -p "$(dirname "$2")"
+  # cp -RpT "$1" "$2" >> "$BUILD_DIR/package-$PKGNAME.log"
 }
 
 _create_package() { # <package-name> <script>
@@ -549,15 +551,15 @@ tools/build.sh
 TOOLS=$PWD/tools
 export TOOLS
 
-# for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
-#   (_create_package toolchain _package-toolchain.sh)
-#   (_create_package llvmdev _package-llvmdev.sh)
-# done
-# for TARGET in ${SYSROOT_TARGETS[@]}; do
-#   (_create_package compiler-rt _package-compiler-rt.sh)
-#   (_create_package libcxx _package-libcxx.sh)
-#   (_create_package sysroot _package-sysroot.sh)
-# done
+for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
+  (_create_package toolchain _package-toolchain.sh)
+  (_create_package llvmdev _package-llvmdev.sh)
+done
+for TARGET in ${SYSROOT_TARGETS[@]}; do
+  (_create_package compiler-rt _package-compiler-rt.sh)
+  (_create_package libcxx _package-libcxx.sh)
+  (_create_package sysroot _package-sysroot.sh)
+done
 
 # create local test dir for native toolchain
 NATIVE_TOOLCHAIN=
