@@ -1,5 +1,5 @@
 diff --git a/clang/lib/Driver/ToolChains/Darwin.cpp b/clang/lib/Driver/ToolChains/Darwin.cpp
-index 65bd6c6a7..3433e4186 100644
+index 65bd6c6a7..2e9c658fc 100644
 --- a/clang/lib/Driver/ToolChains/Darwin.cpp
 +++ b/clang/lib/Driver/ToolChains/Darwin.cpp
 @@ -35,6 +35,26 @@ using namespace clang::driver::toolchains;
@@ -39,7 +39,25 @@ index 65bd6c6a7..3433e4186 100644
    }
  
    Args.AddLastArg(CmdArgs, options::OPT_twolevel__namespace);
-@@ -1990,9 +2013,18 @@ std::string getOSVersion(llvm::Triple::OSType OS, const llvm::Triple &Triple,
+@@ -1261,8 +1284,15 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
+ 
+   DarwinLibName += getOSLibraryNameSuffix();
+   DarwinLibName += IsShared ? "_dynamic.dylib" : ".a";
+-  SmallString<128> Dir(getDriver().ResourceDir);
+-  llvm::sys::path::append(Dir, "lib", "darwin");
++  SmallString<128> Dir;
++  if (!Args.hasArg(options::OPT_isysroot) && getDriver().SysRoot.empty()) {
++    Dir = llvmsdk_sysroot(getDriver(), getTriple());
++    llvm::sys::path::append(Dir, "lib", "clang", "lib");
++  } else {
++    Dir = getDriver().ResourceDir;
++    llvm::sys::path::append(Dir, "lib", "darwin");
++  }
++
+   if (Opts & RLO_IsEmbedded)
+     llvm::sys::path::append(Dir, "macho_embedded");
+ 
+@@ -1990,9 +2020,18 @@ std::string getOSVersion(llvm::Triple::OSType OS, const llvm::Triple &Triple,
    case llvm::Triple::MacOSX:
      // If there is no version specified on triple, and both host and target are
      // macos, use the host triple to infer OS version.
@@ -59,7 +77,7 @@ index 65bd6c6a7..3433e4186 100644
      else if (!Triple.getMacOSXVersion(OsVersion))
        TheDriver.Diag(diag::err_drv_invalid_darwin_version)
            << Triple.getOSName();
-@@ -2354,6 +2386,7 @@ static void AppendPlatformPrefix(SmallString<128> &Path,
+@@ -2354,6 +2393,7 @@ static void AppendPlatformPrefix(SmallString<128> &Path,
    }
  }
  
@@ -67,7 +85,7 @@ index 65bd6c6a7..3433e4186 100644
  // Returns the effective sysroot from either -isysroot or --sysroot, plus the
  // platform prefix (if any).
  llvm::SmallString<128>
-@@ -2363,6 +2396,8 @@ DarwinClang::GetEffectiveSysroot(const llvm::opt::ArgList &DriverArgs) const {
+@@ -2363,6 +2403,8 @@ DarwinClang::GetEffectiveSysroot(const llvm::opt::ArgList &DriverArgs) const {
      Path = DriverArgs.getLastArgValue(options::OPT_isysroot);
    else if (!getDriver().SysRoot.empty())
      Path = getDriver().SysRoot;
@@ -76,7 +94,7 @@ index 65bd6c6a7..3433e4186 100644
  
    if (hasEffectiveTriple()) {
      AppendPlatformPrefix(Path, getEffectiveTriple());
-@@ -2561,6 +2596,8 @@ void DarwinClang::AddCXXStdlibLibArgs(const ArgList &Args,
+@@ -2561,6 +2603,8 @@ void DarwinClang::AddCXXStdlibLibArgs(const ArgList &Args,
    switch (Type) {
    case ToolChain::CST_Libcxx:
      CmdArgs.push_back("-lc++");
@@ -85,3 +103,17 @@ index 65bd6c6a7..3433e4186 100644
      if (Args.hasArg(options::OPT_fexperimental_library))
        CmdArgs.push_back("-lc++experimental");
      break;
+@@ -2862,6 +2906,13 @@ void Darwin::addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
+           options::OPT_fvisibility_inlines_hidden_static_local_var,
+           options::OPT_fno_visibility_inlines_hidden_static_local_var))
+     CC1Args.push_back("-fvisibility-inlines-hidden-static-local-var");
++
++  if (!DriverArgs.hasArg(options::OPT_isysroot) && getDriver().SysRoot.empty()) {
++    auto sysroot = llvmsdk_sysroot(getDriver(), getTriple());
++    char* sysrootx = strdup(sysroot.c_str());
++    CC1Args.push_back("-isysroot");
++    CC1Args.push_back(sysrootx);
++  }
+ }
+ 
+ void Darwin::addClangCC1ASTargetOptions(
