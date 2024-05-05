@@ -29,6 +29,7 @@ DIST_COMPONENTS=(
   llvm-tblgen \
   llvm-xray \
   llvm-libtool-darwin \
+  llvm-lipo \
 )
 # components without install targets
 EXTRA_COMPONENTS=()
