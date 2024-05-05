@@ -24,6 +24,7 @@ for f in packages/llvm-$LLVM_VERSION-*.tar.xz; do
   if $DRYRUN; then
     echo "[dryrun] webfiles cp ${WFCP_ARGS[@]} '${f##$PWD0/}' '$(basename "$f")'"
   else
-    ../playbit/tools/webfiles cp "${WFCP_ARGS[@]}" "${f##$PWD0/}" "$(basename "$f")"
+    ../playbit/tools/webfiles cp "${WFCP_ARGS[@]}" "${f##$PWD0/}" "$(basename "$f")" &
   fi
 done
+wait
