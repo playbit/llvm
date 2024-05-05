@@ -1,5 +1,5 @@
 diff --git a/clang/lib/Driver/ToolChains/Darwin.cpp b/clang/lib/Driver/ToolChains/Darwin.cpp
-index 65bd6c6a7..fa1343b79 100644
+index 65bd6c6a7..9eb8bcbb5 100644
 --- a/clang/lib/Driver/ToolChains/Darwin.cpp
 +++ b/clang/lib/Driver/ToolChains/Darwin.cpp
 @@ -35,6 +35,62 @@ using namespace clang::driver::toolchains;
@@ -134,7 +134,7 @@ index 65bd6c6a7..fa1343b79 100644
    switch (Type) {
    case ToolChain::CST_Libcxx:
      CmdArgs.push_back("-lc++");
-+    if (!Args.hasArg(options::OPT_isysroot) && getDriver().SysRoot.empty())
++    if (is_llvmsdk_sysroot(Args, getDriver(), getTriple()))
 +      CmdArgs.push_back("-lc++abi");
      if (Args.hasArg(options::OPT_fexperimental_library))
        CmdArgs.push_back("-lc++experimental");
