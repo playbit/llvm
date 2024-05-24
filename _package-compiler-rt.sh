@@ -8,6 +8,11 @@ if [[ $TARGET != wasm* ]]; then
   fi
 fi
 
+if [ -e "$BLOCKSRUNTIME_DIR/lib/libBlocksRuntime.a" ]; then
+  mkdir -p $lib/clang/lib
+  cp -v "$BLOCKSRUNTIME_DIR/lib/libBlocksRuntime.a" $lib/clang/lib
+fi
+
 case $TARGET in
   wasm*)  # note: wasm case must precede playbit case
     _cpmerge $BUILTINS_DIR/lib $lib/clang/lib

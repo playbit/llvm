@@ -60,6 +60,8 @@ public:
 
   bool HasNativeLLVMSupport() const override { return true; }
   bool IsMathErrnoDefault() const override { return false; }
+  //bool IsBlocksDefault() const override { return true; } // -fno-blocks to disable
+  bool IsBlocksDefault() const override { return false; } // -fblocks to enable
   bool isPICDefault() const override { return false; }
   bool isPIEDefault(const llvm::opt::ArgList &Args) const override;
   bool isPICDefaultForced() const override { return false; }

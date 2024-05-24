@@ -231,6 +231,9 @@ void playbit::Linker::ConstructJob(Compilation &C, const JobAction &JA,
         Args.hasArg(options::OPT_pthreads))
       CmdArgs.push_back("-lpthread");
 
+    if (Args.hasArg(options::OPT_fblocks) && !Args.hasArg(options::OPT_fno_blocks))
+      CmdArgs.push_back("-lBlocksRuntime");
+
     if (Args.hasArg(options::OPT_fsplit_stack))
       CmdArgs.push_back("--wrap=pthread_create");
 
@@ -372,7 +375,7 @@ bool Playbit::isPIEDefault(const llvm::opt::ArgList &Args) const {
 
 
 bool Playbit::hasBlocksRuntime() const {
-  return !getTriple().isWasm();
+  return true;
 }
 
 

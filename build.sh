@@ -60,6 +60,7 @@ HOST_ARCH=${HOST_ARCH/arm64/aarch64}
 HOST_SYS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_SYS=${HOST_SYS/darwin/macos}
 
+ENABLE_LLVM_DEV_FILES=false
 VERBOSE=false
 PRINT_CONFIG=false
 ENABLE_LTO=true
@@ -296,7 +297,7 @@ export LLC=$LLVM_STAGE1_DIR/bin/llc
 export LLVM_LINK=$LLVM_STAGE1_DIR/bin/llvm-link
 export STRIP=$LLVM_STAGE1_DIR/bin/llvm-strip
 
-GENERIC_CFLAGS="-isystem$LLVM_STAGE1_DIR/include -fPIC"
+GENERIC_CFLAGS="-isystem$LLVM_STAGE1_DIR/include"
 GENERIC_LDFLAGS="--rtlib=compiler-rt"
 # GENERIC_LDFLAGS="--rtlib=compiler-rt --ld-path=$LLVM_STAGE1_DIR/bin/ld.lld"
 
@@ -359,6 +360,7 @@ BASE_LDFLAGS=$LDFLAGS
 for TARGET in ${SYSROOT_TARGETS[@]}; do
   echo "~~~~~~~~~~~~~~~~~~~~ sysroot $TARGET ~~~~~~~~~~~~~~~~~~~~"
   _setenv_for_target $TARGET
+  CFLAGS="$CFLAGS -isystem$SYSROOT/usr/include"
   CFLAGS="$CFLAGS -isystem$S1_CLANGRES_DIR/include"  # compiler headers (e.g. stdint.h)
   CFLAGS_NOLTO=$CFLAGS
 
@@ -390,11 +392,19 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   LIBCXX_DIR=$BUILD_DIR/libcxx
   _run_if_missing "$LIBCXX_DIR/lib/libc++.a" _libcxx.sh
   echo "Using libc++.a at ${LIBCXX_DIR##$PWD0/}"
-  CFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
+  # CFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
+  # CXXFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
   LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib"
+
+  # libBlocksRuntime
+  BLOCKSRUNTIME_DIR=$BUILD_DIR/blocks-runtime
+  _run_if_missing "$BLOCKSRUNTIME_DIR/lib/libBlocksRuntime.a" _blocks-runtime.sh
+  echo "Using libBlocksRuntime.a at ${BLOCKSRUNTIME_DIR##$PWD0/}/"
 
   # disable LTO for compiler-rt
   CFLAGS=$CFLAGS_NOLTO
+
+  # the rest of this loop body is for building compiler-rt
 
   # compiler-rt (excluding builtins, which we built earlier)
   # compiler-rt's cmake setup requires a configured general LLVM, so we need
@@ -553,7 +563,9 @@ export TOOLS
 
 for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   (_create_package toolchain _package-toolchain.sh)
-  (_create_package llvmdev _package-llvmdev.sh)
+  if $ENABLE_LLVM_DEV_FILES; then
+    (_create_package llvmdev _package-llvmdev.sh)
+  fi
 done
 for TARGET in ${SYSROOT_TARGETS[@]}; do
   (_create_package compiler-rt _package-compiler-rt.sh)

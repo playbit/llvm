@@ -93,6 +93,12 @@ CMAKE_ARGS+=( -DLLVM_CMAKE_DIR="$LLVM_STAGE2_DIR-build" )
 # CMAKE_ARGS+=( --fresh )
 CC_TRIPLE=$(_clang_triple $TARGET)
 
+# fix for broken cmake tests
+if [ -e "$SYSROOT/lib/libc.so" ]; then
+  mv "$SYSROOT/lib/libc.so" "$SYSROOT/lib/libc-TEMPORARILY-DISABLED.so"
+  trap "mv '$SYSROOT/lib/libc-TEMPORARILY-DISABLED.so' '$SYSROOT/lib/libc.so'" EXIT
+fi
+
 rm -f "$BUILDDIR/CMakeCache.txt"
 mkdir -p "$BUILDDIR"
 cmake -G Ninja -S "$LLVM_STAGE2_SRC/compiler-rt" -B "$BUILDDIR" \
