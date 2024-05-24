@@ -74,10 +74,10 @@ _popd
 
 # fix dynamic linker symlink
 rm "$SYSROOT"/lib/ld-musl-*.so.1
-ln -s libc.so "$SYSROOT/lib/ld.so.1"
+ln -fs libc.so "$SYSROOT/lib/ld.so.1"
 
 # move libc.so aside for now to avoid accidentally linking with it
-mv "$SYSROOT/lib/libc.so" "$SYSROOT/lib/libc-TEMPORARILY_RENAMED.so"
+#mv "$SYSROOT/lib/libc.so" "$SYSROOT/lib/libc-TEMPORARILY_RENAMED.so"
 
 # Installs a few BSD compatibility headers
 # (cdefs, queue, tree; known as bsd-compat-headers in alpine)

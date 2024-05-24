@@ -83,7 +83,7 @@ cmake -G Ninja -Wno-dev "$LLVM_STAGE1_SRC/llvm" \
   -DCMAKE_MODULE_LINKER_FLAGS="$CMAKE_LD_FLAGS" \
   \
   -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly" \
-  -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt" \
+  -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt;lldb" \
   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]:-}")" \
   -DLLVM_ENABLE_MODULES=OFF \
@@ -170,6 +170,7 @@ ninja -j$NCPU \
   llvm-libraries \
   llvm-headers \
   clang-tblgen \
+  lldb-tblgen \
   cxxabi
 
 ninja -j$NCPU \
@@ -185,6 +186,7 @@ ninja -j$NCPU \
   install-cxxabi-stripped
 
 cp -av bin/clang-tblgen "$LLVM_STAGE1_DIR/bin/clang-tblgen"
+cp -av bin/lldb-tblgen "$LLVM_STAGE1_DIR/bin/lldb-tblgen"
 ln -fsv llvm-objcopy "$LLVM_STAGE1_DIR/bin/llvm-strip"
 ln -fsv llvm-libtool-darwin "$LLVM_STAGE1_DIR/bin/libtool"
 

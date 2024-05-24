@@ -1,7 +1,19 @@
 SELF_SCRIPT=$(realpath "${BASH_SOURCE[0]}")
 BUILD_DIR=$LLVM_STAGE2_DIR-build
 DESTDIR=$LLVM_STAGE2_DIR
-ENABLE_LLVM_DEV_FILES=true
+
+# ENABLE_LLVM_DEV_FILES=true -- set in build.sh
+ENABLE_STATIC_LINKING=false
+ENABLE_LLDB=true
+
+if [[ $TARGET == *macos* ]]; then
+  # enable static linking for macos for now since I can't figure out why:
+  #   ld64.lld: error: undefined symbol: __cxa_thread_atexit_impl
+  # even though we link with -lc++abi
+  ENABLE_STATIC_LINKING=true
+  # don't build lldb
+  ENABLE_LLDB=false
+fi
 
 DIST_COMPONENTS=(
   clang \
@@ -31,6 +43,9 @@ DIST_COMPONENTS=(
   llvm-libtool-darwin \
   llvm-lipo \
 )
+if $ENABLE_LLDB; then
+  DIST_COMPONENTS+=( lldb lldb-server )
+fi
 # components without install targets
 EXTRA_COMPONENTS=()
 EXTRA_COMPONENTS+=( clang-tblgen )
@@ -66,16 +81,27 @@ CMAKE_CXX_FLAGS=( \
   "-isystem$SYSROOT/usr/include" \
 )
 CMAKE_LD_FLAGS=( $LDFLAGS -L$LIBCXX_DIR/lib -lc++abi )
-# CMAKE_LD_FLAGS=( $LDFLAGS -L$LIBCXX_DIR/lib -lc++ -lc++abi )
 EXTRA_CMAKE_ARGS=( -Wno-dev )
-# CMAKE_CXX_FLAGS+=( -nostdinc++ )
-# CMAKE_LD_FLAGS+=( -nostdlib++ )
 
-ENABLE_STATIC_LINKING=true
+
+if $ENABLE_STATIC_LINKING; then
+  EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=OFF )
+  EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=OFF )
+else
+  EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=ON )
+  EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=ON )
+  EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=ON )
+  EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PLUGINS=OFF )
+fi
+
 case $TARGET in
   *linux|*playbit|wasm*)
-    CMAKE_C_FLAGS+=( -static )
-    CMAKE_LD_FLAGS+=( -static )
+    if $ENABLE_STATIC_LINKING; then
+      CMAKE_C_FLAGS+=( -static )
+      CMAKE_LD_FLAGS+=( -static )
+    elif [[ $TARGET == *playbit ]]; then
+      CMAKE_LD_FLAGS+=( "-Wl,-dynamic-linker,/lib/ld.so.1" )
+    fi
     ;;
   *macos*)
     EXTRA_CMAKE_ARGS+=( \
@@ -90,7 +116,11 @@ case $TARGET in
     ;;
 esac
 
-# note: there are clang-specific option, even though it doesn't start with CLANG_
+# LLDB does not use <NAME>_LIBRARY or <NAME>_INCLUDE_DIR vars, so we need to set FLAGS
+CMAKE_C_FLAGS+=( -I$ZLIB_DIR/include -I$ZSTD_DIR/include -I$LIBXML2_DIR/include/libxml2 )
+CMAKE_LD_FLAGS+=( -L$ZLIB_DIR/lib -L$ZSTD_DIR/lib -L$LIBXML2_DIR/lib )
+
+# note: these are clang-specific option, even though it doesn't start with CLANG_
 # See: llvm/clang/CMakeLists.txt
 #
 # DEFAULT_SYSROOT sets the default --sysroot=<path>.
@@ -250,6 +280,13 @@ then
 #
 # EXTRA_CMAKE_ARGS+=( --fresh )
 
+if $ENABLE_LLDB; then
+  LLVM_ENABLE_PROJECTS="clang;lld;lldb"
+  EXTRA_CMAKE_ARGS+=( -DLLDB_TABLEGEN_EXE="$LLVM_STAGE1_DIR/bin/lldb-tblgen" )
+else
+  LLVM_ENABLE_PROJECTS="clang;lld"
+fi
+
 cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DCMAKE_INSTALL_PREFIX= \
@@ -271,7 +308,7 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCMAKE_SYSROOT="$SYSROOT" \
   \
   -DLLVM_TARGETS_TO_BUILD="$(_array_join ";" "${LLVM_TARGETS_TO_BUILD[@]}")" \
-  -DLLVM_ENABLE_PROJECTS="clang;lld" \
+  -DLLVM_ENABLE_PROJECTS="$LLVM_ENABLE_PROJECTS" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]}")" \
   -DLLVM_APPEND_VC_REV=OFF \
   -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_UTILS=OFF \
@@ -286,8 +323,6 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DLLDB_ENABLE_PYTHON=OFF \
   -DLLVM_ENABLE_OCAMLDOC=OFF \
   -DLLVM_ENABLE_Z3_SOLVER=OFF \
-  -DLLVM_ENABLE_PIC=OFF \
-  -DLLVM_BUILD_LLVM_DYLIB=OFF \
   -DLLVM_BUILD_LLVM_C_DYLIB=OFF \
   \
   -DCLANG_ENABLE_ARCMT=OFF \
@@ -362,8 +397,20 @@ mv "$DESTDIR/bin/clang-${LLVM_VERSION%%.*}" "$DESTDIR/bin/clang"
 # no install target for clang-tblgen
 install -vm 0755 bin/clang-tblgen "$DESTDIR/bin/clang-tblgen"
 
+if ! $ENABLE_STATIC_LINKING; then
+  mkdir -p "$DESTDIR/lib"
+  if $ENABLE_LLDB; then
+    for f in lib/liblldb.so lib/liblldb.so.*; do
+      [ -e "$f" ] || continue
+      cp -v -a $f $DESTDIR/lib/
+    done
+  fi
+  cp -v -a lib/libLLVM-17.so $DESTDIR/lib/
+fi
+
 if $ENABLE_LLVM_DEV_FILES; then
-  # no install targets for lld libs
+  # no install targets for lld libs, so do it ourselves
+  mkdir -p "$DESTDIR/lib"
   for f in lib/liblld*.a; do
     install -vm 0644 $f "$DESTDIR/lib/$(basename "$f")"
   done
