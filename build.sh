@@ -51,6 +51,18 @@ LIBXML2_VERSION=2.11.5
 LIBXML2_SHA256=3727b078c360ec69fa869de14bd6f75d7ee8d36987b071e6928d4720a28df3a6
 LIBXML2_URL=https://download.gnome.org/sources/libxml2/${LIBXML2_VERSION%.*}/libxml2-$LIBXML2_VERSION.tar.xz
 
+NCURSES_VERSION=6.5-20240427
+NCURSES_SHA256=abf30fcb0f97706cb3f62703595c561515f6b7c257dce2e3c8dee7d83afdfa76
+NCURSES_URL=https://invisible-mirror.net/archives/ncurses/current/ncurses-${NCURSES_VERSION}.tgz
+
+LIBEDIT_VERSION=20240517-3.1
+LIBEDIT_SHA256=3a489097bb4115495f3bd85ae782852b7097c556d9500088d74b6fa38dbd12ff
+LIBEDIT_URL=https://www.thrysoee.dk/editline/libedit-${LIBEDIT_VERSION}.tar.gz
+
+XZ_VERSION=5.6.1
+XZ_SHA256=237284fae40e5f8e9908f0a977e7d0b9a5c7c1c10a41b8e6ed0fb40e930467c8
+XZ_URL=https://github.com/tukaani-project/xz/archive/refs/tags/v${XZ_VERSION}/xz-${XZ_VERSION}.tar.gz
+
 BINARYEN_VERSION=117
 BINARYEN_SHA256=9acf7cc5be94bcd16bebfb93a1f5ac6be10e0995a33e1981dd7c404dafe83387
 BINARYEN_URL=https://github.com/WebAssembly/binaryen/archive/refs/tags/version_$BINARYEN_VERSION.tar.gz
@@ -141,6 +153,7 @@ BUILD_DIR_S2=${BUILD_DIR_S2:-$PWD/build-target}
 PACKAGE_DIR_BASE=${PACKAGE_DIR:-$PWD/packages}
 
 STAGE1_CFLAGS=()
+STAGE1_CPPFLAGS=()
 STAGE1_LDFLAGS=()
 if [ $HOST_ARCH = x86_64 ]; then
   STAGE1_CFLAGS+=( -march=native )
@@ -166,6 +179,9 @@ Configuration:
     ZLIB_VERSION    $ZLIB_VERSION
     ZSTD_VERSION    $ZSTD_VERSION
     LIBXML2_VERSION $LIBXML2_VERSION
+    NCURSES_VERSION $NCURSES_VERSION
+    LIBEDIT_VERSION $LIBEDIT_VERSION
+    XZ_VERSION      $XZ_VERSION
   SYSROOT_TARGETS   ${SYSROOT_TARGETS[*]}
     MUSL_VERSION    $MUSL_VERSION
     WASI_GIT_TAG    $WASI_GIT_TAG
@@ -228,7 +244,18 @@ ASM=${ASM:-$CC}; AS=$ASM
 LD=${LD:-$CXX}
 RANLIB=${RANLIB:-ranlib}
 CFLAGS=${STAGE1_CFLAGS[@]:-}
+CPPFLAGS=${STAGE1_CPPFLAGS[@]:-}
 LDFLAGS=${STAGE1_LDFLAGS[@]:-}
+HOST_CC=$CC
+HOST_CXX=$CXX
+HOST_AR=$AR
+HOST_ASM=$ASM
+HOST_LD=$LD
+HOST_RANLIB=$RANLIB
+HOST_CFLAGS=$CFLAGS
+HOST_CPPFLAGS=$CPPFLAGS
+HOST_LDFLAGS=$LDFLAGS
+HOST_TRIPLE=$($CC -print-target-triple)
 
 BUILD_DIR=$BUILD_DIR_S1
 mkdir -p "$BUILD_DIR"
@@ -269,8 +296,6 @@ _run_if_missing "$LLVM_STAGE1_DIR/bin/clang" _llvm-stage1.sh llvm-s1
 echo "Using llvm-stage1 at ${LLVM_STAGE1_DIR##$PWD0/}/"
 export PATH=$LLVM_STAGE1_DIR/bin:$PATH
 
-HOST_TRIPLE=$($LLVM_STAGE1_DIR/bin/clang -print-target-triple)
-
 # ————————————————————————————————————————————————————————————————————————————
 # stage 2
 
@@ -300,6 +325,7 @@ export STRIP=$LLVM_STAGE1_DIR/bin/llvm-strip
 GENERIC_CFLAGS="-isystem$LLVM_STAGE1_DIR/include"
 GENERIC_LDFLAGS="--rtlib=compiler-rt"
 # GENERIC_LDFLAGS="--rtlib=compiler-rt --ld-path=$LLVM_STAGE1_DIR/bin/ld.lld"
+HOST_TRIPLE=$($LLVM_STAGE1_DIR/bin/clang -print-target-triple)
 
 S1_CLANGRES_DIR=$(realpath $($LLVM_STAGE1_DIR/bin/clang --print-runtime-dir)/../..)
 
@@ -329,6 +355,7 @@ _setenv_for_target() {
   BUILD_DIR=$BUILD_DIR_S2/$TARGET
   SYSROOT=$BUILD_DIR/sysroot
   CFLAGS="$GENERIC_CFLAGS --target=$CC_TRIPLE --sysroot=$SYSROOT"
+  CPPFLAGS="$GENERIC_CFLAGS --target=$CC_TRIPLE --sysroot=$SYSROOT"
   LDFLAGS="$GENERIC_LDFLAGS --target=$CC_TRIPLE --sysroot=$SYSROOT"
   case $TARGET in
     aarch64-macos)   MAC_TARGET_VERSION=11.0; export MAC_TARGET_VERSION ;;
@@ -339,6 +366,7 @@ _setenv_for_target() {
   export BUILD_DIR
   export SYSROOT
   export CFLAGS
+  export CPPFLAGS
   export LDFLAGS
 }
 
@@ -390,11 +418,11 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
 
   # libc++
   LIBCXX_DIR=$BUILD_DIR/libcxx
-  _run_if_missing "$LIBCXX_DIR/lib/libc++.a" _libcxx.sh
+  _run_if_missing "$LIBCXX_DIR/lib/libc++.a-xx" _libcxx.sh
   echo "Using libc++.a at ${LIBCXX_DIR##$PWD0/}"
   # CFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
   # CXXFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
-  LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib"
+  LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib" # for libunwind
 
   # libBlocksRuntime
   BLOCKSRUNTIME_DIR=$BUILD_DIR/blocks-runtime
@@ -445,6 +473,9 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/lib/"
 done
 
+# Link llvm tools statically rather than with libLLVM.so
+LLVM_ENABLE_STATIC_LINKING=false
+
 for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   echo "~~~~~~~~~~~~~~~~~~~~ toolchain $TARGET ~~~~~~~~~~~~~~~~~~~~"
   _setenv_for_target $TARGET
@@ -458,6 +489,14 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
 
   CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
   LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
+  LDFLAGS="$LDFLAGS -L$LIBCXX_DIR/lib" # for libunwind
+
+  CFLAGS_TOOLS_SAVE=$CFLAGS
+  if ! $LLVM_ENABLE_STATIC_LINKING && $ENABLE_LTO; then
+    # all these supporting libs must be built with -fPIC when LTO is enabled
+    # Also set default optimization level
+    CFLAGS="$CFLAGS -O2 -fPIC"
+  fi
 
   # zlib
   ZLIB_DIR=$BUILD_DIR/zlib
@@ -473,6 +512,24 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   LIBXML2_DIR=$BUILD_DIR/libxml2
   _run_if_missing "$LIBXML2_DIR/lib/libxml2.a" _libxml2.sh
   echo "Using libxml2.a at ${LIBXML2_DIR##$PWD0/}/"
+
+  # ncurses
+  NCURSES_DIR=$BUILD_DIR/ncurses
+  _run_if_missing "$NCURSES_DIR/lib/libncurses.a" _ncurses.sh
+  echo "Using libncurses.a at ${NCURSES_DIR##$PWD0/}/"
+
+  # libedit
+  LIBEDIT_DIR=$BUILD_DIR/libedit
+  _run_if_missing "$LIBEDIT_DIR/lib/libedit.a" _libedit.sh
+  echo "Using libedit.a at ${LIBEDIT_DIR##$PWD0/}/"
+
+  # xz
+  XZ_DIR=$BUILD_DIR/xz
+  _run_if_missing "$XZ_DIR/lib/liblzma.a" _xz.sh
+  echo "Using liblzma.a at ${XZ_DIR##$PWD0/}/"
+
+  # restore CFLAGS
+  CFLAGS=$CFLAGS_TOOLS_SAVE
 
   # llvm (stage 2; for target, not host)
   LLVM_STAGE2_DIR=$BUILD_DIR/llvm

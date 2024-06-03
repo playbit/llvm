@@ -4,7 +4,7 @@ for f in $(echo "$ZLIB_PATCHDIR"/*.patch | sort); do
   patch -p1 < "$f"
 done
 
-CFLAGS="$CFLAGS -O2 -Wno-macro-redefined" \
+CFLAGS="$CFLAGS -Wno-macro-redefined" \
 ./configure --static --prefix=
 
 # make

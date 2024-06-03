@@ -3,7 +3,7 @@ BUILD_DIR=$LLVM_STAGE2_DIR-build
 DESTDIR=$LLVM_STAGE2_DIR
 
 # ENABLE_LLVM_DEV_FILES=true -- set in build.sh
-ENABLE_STATIC_LINKING=false
+ENABLE_STATIC_LINKING=$LLVM_ENABLE_STATIC_LINKING
 ENABLE_LLDB=true
 
 if [[ $TARGET == *macos* ]]; then
@@ -20,6 +20,7 @@ DIST_COMPONENTS=(
   clang-format \
   clang-resource-headers \
   lld \
+  dsymutil \
   llvm-ar \
   llvm-as \
   llvm-config \
@@ -44,7 +45,7 @@ DIST_COMPONENTS=(
   llvm-lipo \
 )
 if $ENABLE_LLDB; then
-  DIST_COMPONENTS+=( lldb lldb-server )
+  DIST_COMPONENTS+=( lldb lldb-server liblldb )
 fi
 # components without install targets
 EXTRA_COMPONENTS=()
@@ -116,9 +117,60 @@ case $TARGET in
     ;;
 esac
 
+
 # LLDB does not use <NAME>_LIBRARY or <NAME>_INCLUDE_DIR vars, so we need to set FLAGS
-CMAKE_C_FLAGS+=( -I$ZLIB_DIR/include -I$ZSTD_DIR/include -I$LIBXML2_DIR/include/libxml2 )
-CMAKE_LD_FLAGS+=( -L$ZLIB_DIR/lib -L$ZSTD_DIR/lib -L$LIBXML2_DIR/lib )
+CMAKE_C_FLAGS+=( -I$ZLIB_DIR/include )
+CMAKE_LD_FLAGS+=( -L$ZLIB_DIR/lib )
+
+CMAKE_C_FLAGS+=( -I$ZSTD_DIR/include )
+CMAKE_LD_FLAGS+=( -L$ZSTD_DIR/lib )
+
+CMAKE_C_FLAGS+=( -I$LIBXML2_DIR/include/libxml2 )
+CMAKE_LD_FLAGS+=( -L$LIBXML2_DIR/lib )
+
+CMAKE_C_FLAGS+=( "-I$NCURSES_DIR/include" "-I$NCURSES_DIR/include/ncursesw" )
+CMAKE_LD_FLAGS+=( "-L$NCURSES_DIR/lib" )
+
+CMAKE_C_FLAGS+=( "-I$LIBEDIT_DIR/include" )
+CMAKE_LD_FLAGS+=( "-L$LIBEDIT_DIR/lib" )
+
+CMAKE_C_FLAGS+=( "-I$XZ_DIR/include" )
+CMAKE_LD_FLAGS+=( "-L$XZ_DIR/lib" )
+
+if $ENABLE_LLDB; then
+  EXTRA_CMAKE_ARGS+=(
+    -DLLDB_ENABLE_LIBXML2=ON \
+    \
+    -DLLDB_ENABLE_CURSES=ON \
+    -DCURSES_INCLUDE_DIRS="$NCURSES_DIR/include" \
+    -DCURSES_LIBRARIES="$NCURSES_DIR/lib/libncursesw.a" \
+    -DPANEL_LIBRARIES="$NCURSES_DIR/lib/libpanelw.a" \
+    \
+    -DLLDB_ENABLE_LIBEDIT=ON \
+    -DLibEdit_INCLUDE_DIRS="$LIBEDIT_DIR/include" \
+    -DLibEdit_LIBRARIES="$LIBEDIT_DIR/lib/libedit.a" \
+    \
+    -DLLDB_ENABLE_LZMA=ON \
+    -DLIBLZMA_INCLUDE_DIR="$XZ_DIR/include" \
+    -DLIBLZMA_LIBRARY="$XZ_DIR/lib/liblzma.a" \
+    -DLIBLZMA_HAS_AUTO_DECODER=YES \
+    -DLIBLZMA_HAS_EASY_ENCODER=YES \
+    -DLIBLZMA_HAS_LZMA_PRESET=YES \
+    \
+    -DLLDB_ENABLE_SWIG=OFF \
+    -DLLDB_ENABLE_LUA=OFF \
+    -DLLDB_ENABLE_FBSDVMCORE=OFF \
+  )
+fi
+
+EXTRA_CMAKE_ARGS+=(
+  -DLLVM_ENABLE_TERMINFO=ON \
+  -DTerminfo_LIBRARIES="$NCURSES_DIR/lib/libncursesw.a" \
+  -DLLVM_ENABLE_LIBEDIT=ON \
+)
+
+# this needs to be set even when ENABLE_LLDB=false
+EXTRA_CMAKE_ARGS+=( -DLLDB_ENABLE_PYTHON=OFF )
 
 # note: these are clang-specific option, even though it doesn't start with CLANG_
 # See: llvm/clang/CMakeLists.txt
@@ -233,22 +285,7 @@ case "$TARGET" in
     ;;
 esac
 
-LLVM_TARGETS_TO_BUILD=()
-SYSROOT_TARGETS_STR=${SYSROOT_TARGETS[*]}
-[[ "$SYSROOT_TARGETS_STR" == *x86* ]] && LLVM_TARGETS_TO_BUILD+=( X86 )
-[[ "$SYSROOT_TARGETS_STR" == *aarch64* ]] && LLVM_TARGETS_TO_BUILD+=( AArch64 )
-[[ "$SYSROOT_TARGETS_STR" == *riscv* ]] && LLVM_TARGETS_TO_BUILD+=( RISCV )
-[[ "$SYSROOT_TARGETS_STR" == *wasm* ]] && LLVM_TARGETS_TO_BUILD+=( WebAssembly )
-
-EXTRA_CMAKE_ARGS+=( -DLLDB_ENABLE_PYTHON=OFF )
-# EXTRA_CMAKE_ARGS+=(
-#   -DLLDB_ENABLE_CURSES=OFF \
-#   -DLLDB_ENABLE_FBSDVMCORE=OFF \
-#   -DLLDB_ENABLE_LIBEDIT=OFF \
-#   -DLLDB_ENABLE_LUA=OFF \
-#   -DLLDB_INCLUDE_TESTS=OFF \
-#   -DLLDB_TABLEGEN_EXE="$LLVM_STAGE1_DIR/bin/lldb-tblgen" \
-# )
+LLVM_TARGETS_TO_BUILD=( AArch64 X86 WebAssembly )
 
 # bake flags (array -> string)
 CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS[@]:-} ${CMAKE_C_FLAGS[@]:-}"
@@ -290,6 +327,7 @@ fi
 cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DCMAKE_INSTALL_PREFIX= \
+  -DLLVM_NATIVE_TOOL_DIR="$LLVM_STAGE1_DIR/bin" \
   \
   -DCMAKE_ASM_COMPILER="$CC" \
   -DCMAKE_C_COMPILER="$CC" \
@@ -317,10 +355,7 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DLLVM_INCLUDE_BENCHMARKS=OFF \
   -DLLVM_INCLUDE_TOOLS=ON \
   -DLLVM_ENABLE_BINDINGS=OFF \
-  -DLLVM_ENABLE_TERMINFO=OFF \
-  -DLLVM_ENABLE_LIBEDIT=OFF \
   -DLLVM_ENABLE_FFI=OFF \
-  -DLLDB_ENABLE_PYTHON=OFF \
   -DLLVM_ENABLE_OCAMLDOC=OFF \
   -DLLVM_ENABLE_Z3_SOLVER=OFF \
   -DLLVM_BUILD_LLVM_C_DYLIB=OFF \
@@ -399,13 +434,10 @@ install -vm 0755 bin/clang-tblgen "$DESTDIR/bin/clang-tblgen"
 
 if ! $ENABLE_STATIC_LINKING; then
   mkdir -p "$DESTDIR/lib"
-  if $ENABLE_LLDB; then
-    for f in lib/liblldb.so lib/liblldb.so.*; do
-      [ -e "$f" ] || continue
-      cp -v -a $f $DESTDIR/lib/
-    done
-  fi
   cp -v -a lib/libLLVM-17.so $DESTDIR/lib/
+  cp -v -a lib/libclang*.so* $DESTDIR/lib/
+  $STRIP "$(realpath "$DESTDIR/lib/libLLVM-17.so")"
+  $STRIP "$(realpath "$DESTDIR/lib/libclang-cpp.so")"
 fi
 
 if $ENABLE_LLVM_DEV_FILES; then
