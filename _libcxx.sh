@@ -140,9 +140,14 @@ echo "" >> $config_site
 echo "#endif" >> $config_site
 
 
-# generate build files
+
+# note: don't build with LTO, even when ENABLE_LTO=true
 GENERIC_CFLAGS=(
-  -fPIC -O2 -DNDEBUG -resource-dir="$BUILTINS_DIR_FOR_S1_CC/" \
+  -fPIC \
+  -O2 \
+  -DNDEBUG \
+  -fno-lto \
+  -resource-dir="$BUILTINS_DIR_FOR_S1_CC/" \
   -isystem$S1_CLANGRES_DIR/include \
   -nostdlib \
   -funwind-tables \
@@ -170,6 +175,7 @@ GENERIC_LIBCXX_CFLAGS=(
   -I$LIBCXXABI/include \
   -DLIBCXX_BUILDING_LIBCXXABI \
   -D_LIBCPP_BUILDING_LIBRARY \
+  -D_LIBCPP_REMOVE_TRANSITIVE_INCLUDES \
 )
 GENERIC_LIBUNWIND_CFLAGS=(
   -fomit-frame-pointer \
@@ -216,17 +222,16 @@ LIBUNWIND_OBJECTS=()
 LIBCXXABI_OBJECTS=()
 LIBCXX_OBJECTS=()
 CXXFLAGS="$CFLAGS"
-CFLAGS="$CFLAGS ${GENERIC_CXXFLAGS[@]}"
 CXXFLAGS="$CXXFLAGS -I$(dirname $config_site) ${GENERIC_CXXFLAGS[@]}"
 CXXFLAGS="$CXXFLAGS -isystem$SYSROOT/usr/include"
 CXXFLAGS="$CXXFLAGS -isystem$S1_CLANGRES_DIR/include"
 CXXFLAGS="$CXXFLAGS ${GENERIC_CFLAGS[@]}"
 CFLAGS="$CFLAGS ${GENERIC_CFLAGS[@]}"
-# note: don't build with LTO, even when ENABLE_LTO=true
 
 LIBUNWIND_CFLAGS=${GENERIC_LIBUNWIND_CFLAGS[@]}
 LIBCXXABI_CFLAGS=${GENERIC_LIBCXXABI_CFLAGS[@]}
-LIBCXX_CFLAGS=${GENERIC_LIBCXX_CFLAGS[@]}
+LIBCXX_CFLAGS="${GENERIC_LIBCXX_CFLAGS[@]}"
+LIBCXX_CFLAGS="$LIBCXX_CFLAGS -fvisibility-inlines-hidden -fvisibility=hidden"
 if [[ $TARGET == wasm* ]]; then
   CFLAGS="$CFLAGS -fno-exceptions"
   CXXFLAGS="$CXXFLAGS -fno-exceptions"
