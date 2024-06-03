@@ -418,7 +418,7 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
 
   # libc++
   LIBCXX_DIR=$BUILD_DIR/libcxx
-  _run_if_missing "$LIBCXX_DIR/lib/libc++.a-xx" _libcxx.sh
+  _run_if_missing "$LIBCXX_DIR/lib/libc++.a" _libcxx.sh
   echo "Using libc++.a at ${LIBCXX_DIR##$PWD0/}"
   # CFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
   # CXXFLAGS="$CFLAGS -I$LIBCXX_DIR/usr/include/c++/v1 -I$LIBCXX_DIR/usr/include"
