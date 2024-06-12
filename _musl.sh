@@ -10,13 +10,9 @@ for f in $(echo "$MUSL_PATCHDIR"/*.patch | sort); do
   patch -p1 < "$f"
 done
 
-ENABLE_EXECINFO=true
+ENABLE_EXECINFO=false
 CC_TRIPLE=$(_clang_triple $TARGET)
 
-# disable LTO
-# Note: musl (1.2.4) does not compile with LTO. Linking will fail with:
-#   error: undefined hidden symbol: __dls2
-CFLAGS="$CFLAGS -fno-lto" \
 ./configure \
   --target=$CC_TRIPLE \
   --build=$HOST_TRIPLE \
@@ -29,7 +25,8 @@ CFLAGS="$CFLAGS -fno-lto" \
   --mandir=/share/man \
   --infodir=/share/info \
   --localstatedir=/var \
-  LDFLAGS="$LDFLAGS -Wl,-soname,libc.so" \
+  CFLAGS="$CFLAGS -fno-lto" \
+  LDFLAGS="$LDFLAGS -Wl,-soname,libc.so $BUILTINS_DIR/lib/libclang_rt.builtins.a" \
   CROSS_COMPILE=$LLVM_STAGE1_DIR/bin/
 
 if $ENABLE_EXECINFO; then
