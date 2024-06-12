@@ -25,6 +25,9 @@ LLVM_SHA256=be5a1e44d64f306bb44fce7d36e3b3993694e8e6122b2348608906283c176db8
 LLVM_URL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VERSION/llvm-project-$LLVM_VERSION.src.tar.xz
 LLVM_PATCHDIR=$PWD/patches-llvm
 
+# Link llvm tools statically rather than with libLLVM.so
+LLVM_ENABLE_STATIC_LINKING=false
+
 MUSL_VERSION=1.2.4
 MUSL_SHA256=99c40dbc9637b66cc3257bcf90decf376053f192440c2a3463a478793cc4397f
 MUSL_URL=https://git.musl-libc.org/cgit/musl/snapshot/v$MUSL_VERSION.tar.gz
@@ -392,6 +395,14 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   CFLAGS="$CFLAGS -isystem$S1_CLANGRES_DIR/include"  # compiler headers (e.g. stdint.h)
   CFLAGS_NOLTO=$CFLAGS
 
+  # builtins
+  BUILTINS_DIR=$BUILD_DIR/builtins
+  BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
+  _run_if_missing "$BUILTINS_DIR/lib/libclang_rt.builtins.a" _builtins.sh
+  echo "Using builtins.a at ${BUILTINS_DIR##$PWD0/}"
+  CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
+  LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
+
   # libc and system headers
   case "$TARGET" in
   *wasi|wasm*playbit)
@@ -407,14 +418,6 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   esac
 
   $ENABLE_LTO && CFLAGS="$CFLAGS -flto=thin"
-
-  # builtins
-  BUILTINS_DIR=$BUILD_DIR/builtins
-  BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
-  _run_if_missing "$BUILTINS_DIR/lib/libclang_rt.builtins.a" _builtins.sh
-  echo "Using builtins.a at ${BUILTINS_DIR##$PWD0/}"
-  CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
-  LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
 
   # libc++
   LIBCXX_DIR=$BUILD_DIR/libcxx
@@ -447,7 +450,14 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
     continue
   fi
 
-  $ENABLE_LTO && CFLAGS="$CFLAGS -flto=thin"
+  if $ENABLE_LTO; then
+    CFLAGS="$CFLAGS -flto=thin"
+    if ! $LLVM_ENABLE_STATIC_LINKING; then
+      # all these supporting libs must be built with -fPIC when LTO is enabled
+      # Also set default optimization level
+      CFLAGS="$CFLAGS -fPIC"
+    fi
+  fi
 
   # zlib
   ZLIB_DIR=$BUILD_DIR/zlib
@@ -464,6 +474,21 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   _run_if_missing "$LIBXML2_DIR/lib/libxml2.a" _libxml2.sh
   echo "Using libxml2.a at ${LIBXML2_DIR##$PWD0/}/"
 
+  # ncurses
+  NCURSES_DIR=$BUILD_DIR/ncurses
+  _run_if_missing "$NCURSES_DIR/lib/libncurses.a" _ncurses.sh
+  echo "Using libncurses.a at ${NCURSES_DIR##$PWD0/}/"
+
+  # libedit
+  LIBEDIT_DIR=$BUILD_DIR/libedit
+  _run_if_missing "$LIBEDIT_DIR/lib/libedit.a" _libedit.sh
+  echo "Using libedit.a at ${LIBEDIT_DIR##$PWD0/}/"
+
+  # xz
+  XZ_DIR=$BUILD_DIR/xz
+  _run_if_missing "$XZ_DIR/lib/liblzma.a" _xz.sh
+  echo "Using liblzma.a at ${XZ_DIR##$PWD0/}/"
+
   LLVM_STAGE2_DIR=$BUILD_DIR/llvm
   ( LLVM_STAGE2_ONLY_CONFIGURE=1
     echo "—————— configuring llvm stage2 for compiler-rt ——————"
@@ -472,9 +497,6 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   _run_script _compiler-rt.sh "compiler-rt $TARGET"
   echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/lib/"
 done
-
-# Link llvm tools statically rather than with libLLVM.so
-LLVM_ENABLE_STATIC_LINKING=false
 
 for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   echo "~~~~~~~~~~~~~~~~~~~~ toolchain $TARGET ~~~~~~~~~~~~~~~~~~~~"
