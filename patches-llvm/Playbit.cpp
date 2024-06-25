@@ -78,18 +78,6 @@ void playbit::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   //CmdArgs.push_back("--enable-new-dtags");
 
-  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
-  if (llvm::sys::path::filename(Exec).equals_insensitive("ld.lld") ||
-      llvm::sys::path::stem(Exec).equals_insensitive("ld.lld")) {
-    CmdArgs.push_back("-z");
-    CmdArgs.push_back("rodynamic");
-    CmdArgs.push_back("-z");
-    CmdArgs.push_back("separate-loadable-segments");
-    CmdArgs.push_back("-z");
-    CmdArgs.push_back("rel");
-    CmdArgs.push_back("--pack-dyn-relocs=relr");
-  }
-
   if (!ToolChain.SysRoot.empty())
     CmdArgs.push_back(Args.MakeArgString("--sysroot=" + ToolChain.SysRoot));
 
@@ -246,6 +234,7 @@ void playbit::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddAllArgs(CmdArgs, options::OPT_T);
 
+  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
   C.addCommand(std::make_unique<Command>(JA, *this,
                                          ResponseFileSupport::AtFileCurCP(),
                                          Exec, CmdArgs, Inputs, Output));
