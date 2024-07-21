@@ -27,11 +27,13 @@ CFLAGS="$CFLAGS -O2 -I."
 
 set -x
 $CC $CFLAGS -fblocks -c "$SRCDIR/data.c" -o data.o
-$CC $CFLAGS -fblocks -c "$SRCDIR/runtime.c" -o runtime.o --trace-includes
+$CC $CFLAGS -fblocks -c "$SRCDIR/runtime.c" -o runtime.o
 
 rm -f "$DESTDIR/lib/libBlocksRuntime.a"
 mkdir -p "$DESTDIR/lib"
 $AR crs "$DESTDIR/lib/libBlocksRuntime.a" data.o runtime.o
+
+set +x
 
 _popd
 $NO_CLEANUP || rm -rf "$BUILDDIR"
