@@ -20,21 +20,20 @@ llvm-VERSION-sysroot-TARGET      libc and system headers for TARGET
 ## Using
 
 Use a pre-built version for your host system and install packages for whatever targets
-you want to build for: (or use the `llvm-install` helper script)
+you want to build for:
 
 ```shell
 $ mkdir llvm && cd llvm
-$ _add() { wget -q -O- http://files.playb.it/llvm-17.0.3-$1.tar.xz | tar -x; }
-$ _add toolchain-$(uname -m)-playbit
-$ _add compiler-rt-aarch64-linux
-$ _add compiler-rt-x86_64-linux
-$ _add compiler-rt-wasm32-wasi
-$ _add libcxx-aarch64-linux
-$ _add libcxx-x86_64-linux
-$ _add libcxx-wasm32-wasi
-$ _add sysroot-aarch64-playbit
-$ _add sysroot-x86_64-playbit
-$ _add sysroot-wasm32-playbit
+$ tar -xf ../llvm-17.0.3-toolchain-$(uname -m)-playbit.tar.xz
+$ tar -xf ../llvm-17.0.3-compiler-rt-aarch64-linux.tar.xz
+$ tar -xf ../llvm-17.0.3-compiler-rt-x86_64-linux.tar.xz
+$ tar -xf ../llvm-17.0.3-compiler-rt-wasm32-wasi.tar.xz
+$ tar -xf ../llvm-17.0.3-libcxx-aarch64-linux.tar.xz
+$ tar -xf ../llvm-17.0.3-libcxx-x86_64-linux.tar.xz
+$ tar -xf ../llvm-17.0.3-libcxx-wasm32-wasi.tar.xz
+$ tar -xf ../llvm-17.0.3-sysroot-aarch64-playbit.tar.xz
+$ tar -xf ../llvm-17.0.3-sysroot-x86_64-playbit.tar.xz
+$ tar -xf ../llvm-17.0.3-sysroot-wasm32-playbit.tar.xz
 ```
 
 Build an example program:
@@ -69,22 +68,6 @@ bin/readelf --file-header $f | grep Machine; done
   Machine:                           Advanced Micro Devices X86-64
 $ head -c4 hello.wasm | hexdump -c
 0000000  \0   a   s   m
-```
-
-You can list available pre-built LLVM components using tools/webfiles:
-`tools/webfiles ls llvm-17.0.3-`
-
-> Note: If you are getting an error "./hello: not found" it is probably because
-> the dynamic linker `/lib/ld.so.1` can't be found (it changed March 10 2024.)
-> Workaround: compile with `-static` or `-Wl,--dynamic-linker=/lib/ld-musl-aarch64.so.1`
-
-
-## Directory structure
-
-```
-bin/                -- clang, ld.lld et al (from "toolchain")
-lib/clang/include/  -- compiler headers (stdint.h etc, from "toolchain")
-sysroot/SYSTEM/ARCH -- headers & libraries for ARCH-playbit target
 ```
 
 
