@@ -75,7 +75,7 @@ HOST_ARCH=${HOST_ARCH/arm64/aarch64}
 HOST_SYS=$(uname -s | tr '[:upper:]' '[:lower:]')
 HOST_SYS=${HOST_SYS/darwin/macos}
 
-ENABLE_LLVM_DEV_FILES=false
+ENABLE_LLVM_DEV_FILES=true
 VERBOSE=false
 PRINT_CONFIG=false
 ENABLE_LTO=true
@@ -83,6 +83,7 @@ REBUILD_LLVM=false
 NO_PACKAGE=false
 NO_CLEANUP=false
 ONLY_TOOLCHAIN_TARGETS=()
+ONLY_SYSROOT_TARGETS=()
 
 XZ_COMPRESSION_RATIO=8 # 0-9 (xz default is 6)
 # XZ_COMPRESSION_RATIO for toolchain-aarch64-macos on an M1 MacBook:
@@ -110,6 +111,9 @@ options:
   --no-cleanup    Don't remove temporary build directories after successful builds
   --compress=<r>  Use this xz compression ratio [0-9] for packages (default: $XZ_COMPRESSION_RATIO)
   --rebuild-llvm  Incrementally (re)build llvm stage 2 even if it's up to date
+  --sysroot-target=<target>
+                  Only build sysroot for <target>. Can be given multiple times.
+                  If not set, build all sysroots (${SYSROOT_TARGETS[*]}).
   -v              Verbose logging
   -h, --help      Show help and exit
 <target>
@@ -123,6 +127,7 @@ _HELP_
   --no-cleanup) NO_CLEANUP=true; shift ;;
   --rebuild-llvm) REBUILD_LLVM=true; shift ;;
   --compress=*) XZ_COMPRESSION_RATIO=${1:11}; shift;;
+  --sysroot-target=*) ONLY_SYSROOT_TARGETS+=( ${1:17} ); shift;;
   -v) VERBOSE=true; shift ;;
   -*) _err "unknown option $1 (see $0 -help)" ;;
   *) ONLY_TOOLCHAIN_TARGETS+=( $1 ); shift;;
@@ -147,6 +152,24 @@ if [ ${#ONLY_TOOLCHAIN_TARGETS[@]} -gt 0 ]; then
     [ -n "$found" ] || _err "Invalid <target> \"$arg\" (see $0 --help)"
   done
   TOOLCHAIN_TARGETS=( ${TOOLCHAIN_TARGETS_FILTERED[@]} )
+fi
+
+
+# filter targets to build sysroot for
+if [ ${#ONLY_SYSROOT_TARGETS[@]} -gt 0 ]; then
+  SYSROOT_TARGETS_FILTERED=()
+  for arg in ${ONLY_SYSROOT_TARGETS[@]}; do
+    found=
+    for TARGET in ${SYSROOT_TARGETS[@]}; do
+      if [ "$TARGET" = "$arg" ]; then
+        SYSROOT_TARGETS_FILTERED+=( $TARGET )
+        found=1
+        break
+      fi
+    done
+    [ -n "$found" ] || _err "Invalid <target> \"$arg\" (see $0 --help)"
+  done
+  SYSROOT_TARGETS=( ${SYSROOT_TARGETS_FILTERED[@]} )
 fi
 
 
