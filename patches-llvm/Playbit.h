@@ -53,6 +53,7 @@ namespace toolchains {
 class LLVM_LIBRARY_VISIBILITY Playbit : public ToolChain {
   friend class clang::driver::tools::playbit::Linker;
   std::string SysRoot;
+  std::string LibClangDir;
   std::string DefaultLinker;
 public:
   Playbit(const Driver &D, const llvm::Triple &Triple,

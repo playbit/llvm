@@ -321,17 +321,34 @@ Playbit::Playbit(const Driver &D, const llvm::Triple &targetTriple, const ArgLis
   if (D.getInstalledDir() != D.Dir)
     getProgramPaths().push_back(D.Dir);
 
+
   // setup search paths
   getFilePaths().clear(); // always empty; just in case it changes in future llvm
   getLibraryPaths().clear(); // always empty; just in case it changes in future llvm
+
   std::string compiler_rt_lib_path = fspath({ SysRoot, "lib", "clang", "lib" });
   // std::cout << "[pb] compiler_rt_lib_path: " << compiler_rt_lib_path << std::endl;
   if (getVFS().exists(compiler_rt_lib_path)) {
-    // std::cout << "  found" << std::endl;
     getFilePaths().push_back(compiler_rt_lib_path);
     getLibraryPaths().push_back(compiler_rt_lib_path);
   }
+
+  LibClangDir = fspath({
+    sdkDir,
+    "lib/clang-" + getTriple().getArchName().str() + "-" + getTriple().getOSName().str()
+  });
+  std::string lib_clang_lib = LibClangDir + "/lib";
+  // std::cout << "[pb] lib_clang_lib: " << lib_clang_lib << std::endl;
+  if (getVFS().exists(lib_clang_lib)) {
+    getFilePaths().push_back(lib_clang_lib);
+    getLibraryPaths().push_back(lib_clang_lib);
+  }
+
   getFilePaths().push_back(fspath({ SysRoot, "lib" }));
+
+  std::string libdir = fspath({ sdkDir, "lib" });
+  if (getVFS().exists(libdir))
+    getFilePaths().push_back(libdir);
 
   // Default linker. Can be overridden with --ld-path= or -fuse-ld=
   // Use absolute path for ld.lld to reduce I/O from ToolChain::GetLinkerPath
@@ -406,7 +423,6 @@ void Playbit::addClangTargetOptions(const ArgList &DriverArgs,
 void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
                                         ArgStringList &CC1Args) const {
   const Driver &D = getDriver();
-  //const llvm::Triple &Triple = getTriple();
 
   // don't add any search paths if -nostdinc is set
   if (DriverArgs.hasArg(options::OPT_nostdinc))
@@ -441,6 +457,7 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
   // }
 
   std::string incPath = fspath({SysRoot, "usr/include"});
+  // std::cout << "[pb] incPath: " << incPath << std::endl;
   if (getVFS().exists(incPath)) {
     addExternCSystemInclude(DriverArgs, CC1Args, incPath);
   } else {
@@ -448,6 +465,11 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
     if (getVFS().exists(incPath))
       addExternCSystemInclude(DriverArgs, CC1Args, incPath);
   }
+
+  std::string sdkDir = std::string(parent_path(parent_path(D.getClangProgramPath())));
+  incPath = fspath({sdkDir, "/usr/include"});
+  if (getVFS().exists(incPath))
+    addExternCSystemInclude(DriverArgs, CC1Args, incPath);
 }
 
 
@@ -466,6 +488,12 @@ void Playbit::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
     if (getVFS().exists(incPath))
       addSystemInclude(DriverArgs, CC1Args, incPath);
   }
+
+  const Driver &D = getDriver();
+  std::string sdkDir = std::string(parent_path(parent_path(D.getClangProgramPath())));
+  incPath = fspath({sdkDir, "/usr/include/c++/v1"});
+  if (getVFS().exists(incPath))
+    addSystemInclude(DriverArgs, CC1Args, incPath);
 }
 
 
@@ -486,20 +514,26 @@ std::string Playbit::getCompilerRT(const ArgList &Args, StringRef Component,
   // printf("[pb] trace %s:%d\n", __FILE__, __LINE__);
   SmallString<128> Path(SysRoot);
   llvm::sys::path::append(Path, "lib/clang/lib");
-  const char *Prefix = (Type == ToolChain::FT_Object) ? "" : "lib";
-  const char *Suffix;
-  switch (Type) {
-  case ToolChain::FT_Object:
-    Suffix = ".o";
-    break;
-  case ToolChain::FT_Static:
-    Suffix = ".a";
-    break;
-  case ToolChain::FT_Shared:
-    Suffix = ".so";
-    break;
+  for (int retried = 0;;) {
+    const char *Prefix = (Type == ToolChain::FT_Object) ? "" : "lib";
+    const char *Suffix;
+    switch (Type) {
+    case ToolChain::FT_Object:
+      Suffix = ".o";
+      break;
+    case ToolChain::FT_Static:
+      Suffix = ".a";
+      break;
+    case ToolChain::FT_Shared:
+      Suffix = ".so";
+      break;
+    }
+    llvm::sys::path::append(Path, Prefix + Twine("clang_rt.") + Component + Suffix);
+    // std::cout << "[pb] getCompilerRT: " << std::string(Path.str()) << std::endl;
+    if (getVFS().exists(Path) || retried++)
+      break;
+    Path.assign(LibClangDir + "/lib");
   }
-  llvm::sys::path::append(Path, Prefix + Twine("clang_rt.") + Component + Suffix);
   return static_cast<std::string>(Path.str());
 }
 
