@@ -1,4 +1,8 @@
-lib=lib; [[ $TARGET == *macos* ]] && lib=usr/lib
+if [[ $TARGET == *macos* ]]; then
+  lib=usr/lib
+else
+  lib=lib
+fi
 
 if [[ $TARGET != wasm* ]]; then
   _cpmerge $COMPILER_RT_DIR/include $lib/clang/include
