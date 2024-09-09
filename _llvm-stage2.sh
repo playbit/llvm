@@ -86,8 +86,14 @@ EXTRA_CMAKE_ARGS=( -Wno-dev )
 
 
 if $ENABLE_STATIC_LINKING; then
-  EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=OFF )
-  EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=OFF )
+  if [[ $TARGET == *macos* ]]; then
+    EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=OFF )
+    EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=OFF )
+  else
+    EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=ON )
+    EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=ON )
+    EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=OFF )
+  fi
 else
   EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=ON )
   EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=ON )
@@ -416,6 +422,8 @@ ninja -j$NCPU distribution ${EXTRA_COMPONENTS[@]:-}
 
 
 if [ -n "${PB_LLVM_STOP_AFTER_BUILD:-}" ]; then
+  echo "Stopping because PB_LLVM_STOP_AFTER_BUILD"
+  echo "Build products can be found at: ${PWD##$PWD0/}"
   exit 0
 fi
 
