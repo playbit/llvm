@@ -133,7 +133,7 @@ cmake -G Ninja -S "$LLVM_STAGE2_SRC/compiler-rt" -B "$BUILDDIR" \
   -DCOMPILER_RT_BUILD_SANITIZERS=ON \
   -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
   -DCOMPILER_RT_BUILD_MEMPROF=OFF \
-  -DCOMPILER_RT_BUILD_PROFILE=OFF \
+  -DCOMPILER_RT_BUILD_PROFILE=ON \
   -DCOMPILER_RT_BUILD_XRAY=OFF \
   -DCOMPILER_RT_BUILD_CRT=OFF \
   -DCOMPILER_RT_BUILD_ORC=OFF \
@@ -170,11 +170,13 @@ cmake -G Ninja -S "$LLVM_STAGE2_SRC/compiler-rt" -B "$BUILDDIR" \
 
 export NINJA_STATUS="[compiler-rt $TARGET %f/%t] "
 ninja -C "$BUILDDIR" compiler-rt
+
+rm -rf "$DESTDIR"
 ninja -C "$BUILDDIR" install
 
 if [ -d "$DESTDIR/lib/$CC_TRIPLE" ]; then
-  mv "$DESTDIR/lib" "$DESTDIR/libx"
-  mv "$DESTDIR/libx/$CC_TRIPLE" "$DESTDIR/lib"
+  mv -v "$DESTDIR/lib" "$DESTDIR/libx"
+  mv -v "$DESTDIR/libx/$CC_TRIPLE" "$DESTDIR/lib"
   rmdir "$DESTDIR/libx"
 fi
 

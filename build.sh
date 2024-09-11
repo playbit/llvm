@@ -469,7 +469,7 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
     *)      CANARY="$COMPILER_RT_DIR/lib/libclang_rt.asan.a" ;;
   esac
   # Skip compiler-rt for wasm targets and skip already-built compiler-rt
-  if [[ $TARGET == wasm* ]] || [ -e "$CANARY" ]; then
+  if [[ $TARGET == wasm* ]] || [ -e "$CANARY" -a "$CANARY" -nt _compiler-rt.sh ]; then
     continue
   fi
 
