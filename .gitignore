@@ -6,5 +6,4 @@
 *.dSYM
 *.tar
 *.tar.xz
-/hello_c_*
-/hello_cc_*
+/hello*

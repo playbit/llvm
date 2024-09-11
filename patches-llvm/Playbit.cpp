@@ -125,6 +125,18 @@ void playbit::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   CmdArgs.push_back("--eh-frame-hdr");
 
+  const char* m;
+  switch (ToolChain.getArch()) {
+    case llvm::Triple::aarch64: m = "aarch64linux"; break;
+    case llvm::Triple::x86:     m = "elf_i386"; break;
+    case llvm::Triple::x86_64:  m = "elf_x86_64"; break;
+    case llvm::Triple::riscv32: m = "elf32lriscv"; break;
+    case llvm::Triple::riscv64: m = "elf64lriscv"; break;
+    default: m = "unknown";
+  }
+  CmdArgs.push_back("-m");
+  CmdArgs.push_back(m);
+
   if (Args.hasArg(options::OPT_static)) {
     CmdArgs.push_back("-Bstatic"); // == -static
   } else {

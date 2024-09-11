@@ -1,5 +1,7 @@
+Darwin toolchain
+
 diff --git a/clang/lib/Driver/ToolChains/Darwin.cpp b/clang/lib/Driver/ToolChains/Darwin.cpp
-index 65bd6c6a7..9eb8bcbb5 100644
+index 65bd6c6a7..229546118 100644
 --- a/clang/lib/Driver/ToolChains/Darwin.cpp
 +++ b/clang/lib/Driver/ToolChains/Darwin.cpp
 @@ -35,6 +35,62 @@ using namespace clang::driver::toolchains;
@@ -75,17 +77,28 @@ index 65bd6c6a7..9eb8bcbb5 100644
    }
  
    Args.AddLastArg(CmdArgs, options::OPT_twolevel__namespace);
-@@ -1261,8 +1320,15 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
+@@ -1253,7 +1312,10 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
+                               bool IsShared) const {
+   SmallString<64> DarwinLibName = StringRef("libclang_rt.");
+   // an Darwin the builtins compomnent is not in the library name
+-  if (Component != "builtins") {
++  if (Component == "builtins") {
++    // builtins are only available as a static library
++    IsShared = false;
++  } else {
+     DarwinLibName += Component;
+     if (!(Opts & RLO_IsEmbedded))
+       DarwinLibName += "_";
+@@ -1261,8 +1323,14 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
  
    DarwinLibName += getOSLibraryNameSuffix();
    DarwinLibName += IsShared ? "_dynamic.dylib" : ".a";
 -  SmallString<128> Dir(getDriver().ResourceDir);
 -  llvm::sys::path::append(Dir, "lib", "darwin");
-+  SmallString<128> Dir;
-+  if (is_llvmsdk_sysroot(Args, getDriver(), getTriple())) {
-+    Dir = llvmsdk_sysroot(getDriver(), getTriple());
-+    llvm::sys::path::append(Dir, "lib", "clang", "lib");
-+  } else {
++  SmallString<128> Dir = llvmsdk_sysroot(getDriver(), getTriple());
++  llvm::sys::path::append(Dir, "usr", "lib", "clang", "lib");
++  // if not found, fall back to Apple defaults: /path/to/clang/../../lib/clang/lib/darwin
++  if (!getVFS().exists(Dir)) {
 +    Dir = getDriver().ResourceDir;
 +    llvm::sys::path::append(Dir, "lib", "darwin");
 +  }
@@ -93,7 +106,7 @@ index 65bd6c6a7..9eb8bcbb5 100644
    if (Opts & RLO_IsEmbedded)
      llvm::sys::path::append(Dir, "macho_embedded");
  
-@@ -1990,9 +2056,18 @@ std::string getOSVersion(llvm::Triple::OSType OS, const llvm::Triple &Triple,
+@@ -1990,9 +2058,18 @@ std::string getOSVersion(llvm::Triple::OSType OS, const llvm::Triple &Triple,
    case llvm::Triple::MacOSX:
      // If there is no version specified on triple, and both host and target are
      // macos, use the host triple to infer OS version.
@@ -113,7 +126,7 @@ index 65bd6c6a7..9eb8bcbb5 100644
      else if (!Triple.getMacOSXVersion(OsVersion))
        TheDriver.Diag(diag::err_drv_invalid_darwin_version)
            << Triple.getOSName();
-@@ -2354,6 +2429,7 @@ static void AppendPlatformPrefix(SmallString<128> &Path,
+@@ -2354,6 +2431,7 @@ static void AppendPlatformPrefix(SmallString<128> &Path,
    }
  }
  
@@ -121,7 +134,7 @@ index 65bd6c6a7..9eb8bcbb5 100644
  // Returns the effective sysroot from either -isysroot or --sysroot, plus the
  // platform prefix (if any).
  llvm::SmallString<128>
-@@ -2363,6 +2439,8 @@ DarwinClang::GetEffectiveSysroot(const llvm::opt::ArgList &DriverArgs) const {
+@@ -2363,6 +2441,8 @@ DarwinClang::GetEffectiveSysroot(const llvm::opt::ArgList &DriverArgs) const {
      Path = DriverArgs.getLastArgValue(options::OPT_isysroot);
    else if (!getDriver().SysRoot.empty())
      Path = getDriver().SysRoot;
@@ -130,7 +143,7 @@ index 65bd6c6a7..9eb8bcbb5 100644
  
    if (hasEffectiveTriple()) {
      AppendPlatformPrefix(Path, getEffectiveTriple());
-@@ -2561,6 +2639,8 @@ void DarwinClang::AddCXXStdlibLibArgs(const ArgList &Args,
+@@ -2561,6 +2641,8 @@ void DarwinClang::AddCXXStdlibLibArgs(const ArgList &Args,
    switch (Type) {
    case ToolChain::CST_Libcxx:
      CmdArgs.push_back("-lc++");
@@ -139,7 +152,7 @@ index 65bd6c6a7..9eb8bcbb5 100644
      if (Args.hasArg(options::OPT_fexperimental_library))
        CmdArgs.push_back("-lc++experimental");
      break;
-@@ -2862,6 +2942,13 @@ void Darwin::addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
+@@ -2862,6 +2944,13 @@ void Darwin::addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
            options::OPT_fvisibility_inlines_hidden_static_local_var,
            options::OPT_fno_visibility_inlines_hidden_static_local_var))
      CC1Args.push_back("-fvisibility-inlines-hidden-static-local-var");

@@ -1,0 +1,15 @@
+Disable dynamic lib tests for musl's dlclose() is noop
+
+diff --git a/llvm/unittests/Support/CMakeLists.txt b/llvm/unittests/Support/CMakeLists.txt
+index 92aca0010..12ef8ee43 100644
+--- a/llvm/unittests/Support/CMakeLists.txt
++++ b/llvm/unittests/Support/CMakeLists.txt
+@@ -132,7 +132,7 @@ target_link_libraries(SupportTests PRIVATE LLVMTestingSupport ${LLVM_PTHREAD_LIB
+ 
+ if(NOT LLVM_INTEGRATED_CRT_ALLOC)
+   # The test doesn't pass when using a custom allocator, PR47881.
+-  add_subdirectory(DynamicLibrary)
++  # add_subdirectory(DynamicLibrary)
+ endif()
+ 
+ add_subdirectory(CommandLineInit)

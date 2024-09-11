@@ -1,3 +1,5 @@
+WebAssembly toolchain
+
 diff --git a/clang/lib/Driver/ToolChains/WebAssembly.cpp b/clang/lib/Driver/ToolChains/WebAssembly.cpp
 index 36bed3166..ff4374dbb 100644
 --- a/clang/lib/Driver/ToolChains/WebAssembly.cpp

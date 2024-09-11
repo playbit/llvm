@@ -1,14 +1,14 @@
 Fix failures in AllocationTests/MappedMemoryTest.* on aarch64:
 
-    Failing Tests (8):
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.AllocAndRelease/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.DuplicateNear/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.EnabledWrite/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.MultipleAllocAndRelease/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.SuccessiveNear/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.UnalignedNear/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.ZeroNear/3
-        LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.ZeroSizeNear/3
+Failing Tests (8):
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.AllocAndRelease/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.DuplicateNear/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.EnabledWrite/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.MultipleAllocAndRelease/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.SuccessiveNear/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.UnalignedNear/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.ZeroNear/3
+    LLVM-Unit :: Support/./SupportTests/AllocationTests/MappedMemoryTest.ZeroSizeNear/3
 
 Upstream-Issue: https://bugs.llvm.org/show_bug.cgi?id=14278#c10
 

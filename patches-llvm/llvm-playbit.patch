@@ -1,0 +1,120 @@
+Playbit target
+
+diff --git a/llvm/include/llvm/TargetParser/Triple.h b/llvm/include/llvm/TargetParser/Triple.h
+index 79ccd644a..f4c680f14 100644
+--- a/llvm/include/llvm/TargetParser/Triple.h
++++ b/llvm/include/llvm/TargetParser/Triple.h
+@@ -225,7 +225,8 @@ public:
+     Emscripten,
+     ShaderModel, // DirectX ShaderModel
+     LiteOS,
+-    LastOSType = LiteOS
++    Playbit,
++    LastOSType = Playbit
+   };
+   enum EnvironmentType {
+     UnknownEnvironment,
+@@ -561,6 +562,10 @@ public:
+     return getOS() == Triple::ELFIAMCU;
+   }
+ 
++  bool isOSPlaybit() const {
++    return getOS() == Triple::Playbit;
++  }
++
+   bool isOSUnknown() const { return getOS() == Triple::UnknownOS; }
+ 
+   bool isGNUEnvironment() const {
+@@ -748,7 +753,8 @@ public:
+            getEnvironment() == Triple::MuslEABI ||
+            getEnvironment() == Triple::MuslEABIHF ||
+            getEnvironment() == Triple::MuslX32 ||
+-           getEnvironment() == Triple::OpenHOS || isOSLiteOS();
++           getEnvironment() == Triple::OpenHOS || isOSLiteOS() ||
++           isOSPlaybit();
+   }
+ 
+   /// Tests whether the target is OHOS
+diff --git a/llvm/lib/Analysis/TargetLibraryInfo.cpp b/llvm/lib/Analysis/TargetLibraryInfo.cpp
+index 05fa67d0b..95c2a3252 100644
+--- a/llvm/lib/Analysis/TargetLibraryInfo.cpp
++++ b/llvm/lib/Analysis/TargetLibraryInfo.cpp
+@@ -102,7 +102,7 @@ static bool hasBcmp(const Triple &TT) {
+     return TT.isGNUEnvironment() || TT.isMusl();
+   // Both NetBSD and OpenBSD are planning to remove the function. Windows does
+   // not have it.
+-  return TT.isOSFreeBSD() || TT.isOSSolaris();
++  return TT.isOSFreeBSD() || TT.isOSSolaris() || TT.isOSPlaybit();
+ }
+ 
+ static bool isCallingConvCCompatible(CallingConv::ID CC, StringRef TT,
+diff --git a/llvm/lib/TargetParser/Triple.cpp b/llvm/lib/TargetParser/Triple.cpp
+index a3d6a06af..c8a5d0802 100644
+--- a/llvm/lib/TargetParser/Triple.cpp
++++ b/llvm/lib/TargetParser/Triple.cpp
+@@ -245,6 +245,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+   case ZOS: return "zos";
+   case ShaderModel: return "shadermodel";
+   case LiteOS: return "liteos";
++  case Playbit: return "playbit";
+   }
+ 
+   llvm_unreachable("Invalid OSType");
+@@ -601,6 +602,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+     .StartsWith("cuda", Triple::CUDA)
+     .StartsWith("nvcl", Triple::NVCL)
+     .StartsWith("amdhsa", Triple::AMDHSA)
++    .StartsWith("playbit", Triple::Playbit)
+     .StartsWith("ps4", Triple::PS4)
+     .StartsWith("ps5", Triple::PS5)
+     .StartsWith("elfiamcu", Triple::ELFIAMCU)
+diff --git a/llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp b/llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp
+index f4bf6db56..ba456bbd0 100644
+--- a/llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp
++++ b/llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp
+@@ -482,7 +482,7 @@ static ShadowMapping getShadowMapping(const Triple &TargetTriple, int LongSize,
+   bool IsFreeBSD = TargetTriple.isOSFreeBSD();
+   bool IsNetBSD = TargetTriple.isOSNetBSD();
+   bool IsPS = TargetTriple.isPS();
+-  bool IsLinux = TargetTriple.isOSLinux();
++  bool IsLinux = TargetTriple.isOSLinux() || TargetTriple.isOSPlaybit();
+   bool IsPPC64 = TargetTriple.getArch() == Triple::ppc64 ||
+                  TargetTriple.getArch() == Triple::ppc64le;
+   bool IsSystemZ = TargetTriple.getArch() == Triple::systemz;
+diff --git a/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp b/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp
+index a7b1953ce..c793eea77 100644
+--- a/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp
++++ b/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp
+@@ -918,7 +918,8 @@ static bool needsRuntimeRegistrationOfSectionRange(const Triple &TT) {
+     return false;
+   // Use linker script magic to get data/cnts/name start/end.
+   if (TT.isOSAIX() || TT.isOSLinux() || TT.isOSFreeBSD() || TT.isOSNetBSD() ||
+-      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows())
++      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows() ||
++      TT.isOSPlaybit())
+     return false;
+ 
+   return true;
+@@ -1287,7 +1288,7 @@ void InstrProfiling::emitRegistration() {
+ bool InstrProfiling::emitRuntimeHook() {
+   // We expect the linker to be invoked with -u<hook_var> flag for Linux
+   // in which case there is no need to emit the external variable.
+-  if (TT.isOSLinux() || TT.isOSAIX())
++  if (TT.isOSLinux() || TT.isOSAIX() || TT.isOSPlaybit())
+     return false;
+ 
+   // If the module's provided its own runtime, we don't need to do anything.
+diff --git a/llvm/unittests/Support/Threading.cpp b/llvm/unittests/Support/Threading.cpp
+index b5eff6f6f..42b0d2654 100644
+--- a/llvm/unittests/Support/Threading.cpp
++++ b/llvm/unittests/Support/Threading.cpp
+@@ -29,7 +29,8 @@ static bool isThreadingSupportedArchAndOS() {
+   return (Host.isOSWindows() && llvm_is_multithreaded()) || Host.isOSDarwin() ||
+          (Host.isX86() && Host.isOSLinux()) ||
+          (Host.isOSLinux() && !Host.isAndroid()) ||
+-         (Host.isSystemZ() && Host.isOSzOS());
++         (Host.isSystemZ() && Host.isOSzOS()) ||
++         Host.isOSPlaybit();
+ #else
+   return false;
+ #endif

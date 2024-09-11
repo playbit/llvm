@@ -1,3 +1,5 @@
+Playbit target
+
 diff --git a/clang/lib/Basic/Targets.cpp b/clang/lib/Basic/Targets.cpp
 index 636b59fd1..27ee18253 100644
 --- a/clang/lib/Basic/Targets.cpp
@@ -104,6 +106,29 @@ index 8f4331b02..77204dd45 100644
  } // namespace targets
  } // namespace clang
  #endif // LLVM_CLANG_LIB_BASIC_TARGETS_OSTARGETS_H
+diff --git a/clang/lib/CodeGen/Targets/X86.cpp b/clang/lib/CodeGen/Targets/X86.cpp
+index 9f5c3258d..b2543da83 100644
+--- a/clang/lib/CodeGen/Targets/X86.cpp
++++ b/clang/lib/CodeGen/Targets/X86.cpp
+@@ -176,7 +176,8 @@ public:
+         IsWin32StructABI(Win32StructABI), IsSoftFloatABI(SoftFloatABI),
+         IsMCUABI(CGT.getTarget().getTriple().isOSIAMCU()),
+         IsLinuxABI(CGT.getTarget().getTriple().isOSLinux() ||
+-                   CGT.getTarget().getTriple().isOSCygMing()),
++                   CGT.getTarget().getTriple().isOSCygMing() ||
++                   CGT.getTarget().getTriple().isOSPlaybit()),
+         DefaultNumRegisterParameters(NumRegisterParameters) {}
+ };
+ 
+@@ -1322,7 +1323,7 @@ class X86_64ABIInfo : public ABIInfo {
+       return false;
+ 
+     const llvm::Triple &T = getTarget().getTriple();
+-    return T.isOSLinux() || T.isOSNetBSD();
++    return T.isOSLinux() || T.isOSNetBSD() || T.isOSPlaybit();
+   }
+ 
+   X86AVXABILevel AVXLevel;
 diff --git a/clang/lib/Driver/CMakeLists.txt b/clang/lib/Driver/CMakeLists.txt
 index a6bd2d41e..fe9f559bb 100644
 --- a/clang/lib/Driver/CMakeLists.txt
@@ -138,37 +163,95 @@ index bdbdad936..7b0ebc0a9 100644
      case llvm::Triple::PS4:
        TC = std::make_unique<toolchains::PS4CPU>(*this, Target, Args);
        break;
-diff --git a/llvm/include/llvm/TargetParser/Triple.h b/llvm/include/llvm/TargetParser/Triple.h
-index 79ccd644a..f97a2b1b9 100644
---- a/llvm/include/llvm/TargetParser/Triple.h
-+++ b/llvm/include/llvm/TargetParser/Triple.h
-@@ -225,7 +225,8 @@ public:
-     Emscripten,
-     ShaderModel, // DirectX ShaderModel
-     LiteOS,
--    LastOSType = LiteOS
-+    Playbit,
-+    LastOSType = Playbit
-   };
-   enum EnvironmentType {
-     UnknownEnvironment,
-diff --git a/llvm/lib/TargetParser/Triple.cpp b/llvm/lib/TargetParser/Triple.cpp
-index a3d6a06af..c8a5d0802 100644
---- a/llvm/lib/TargetParser/Triple.cpp
-+++ b/llvm/lib/TargetParser/Triple.cpp
-@@ -245,6 +245,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
-   case ZOS: return "zos";
-   case ShaderModel: return "shadermodel";
-   case LiteOS: return "liteos";
-+  case Playbit: return "playbit";
+diff --git a/clang/lib/Driver/SanitizerArgs.cpp b/clang/lib/Driver/SanitizerArgs.cpp
+index 12fe55be9..d2e30e47d 100644
+--- a/clang/lib/Driver/SanitizerArgs.cpp
++++ b/clang/lib/Driver/SanitizerArgs.cpp
+@@ -501,7 +501,7 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
+         CoverageFeatures |= CoverageInline8bitCounters | CoverageIndirCall |
+                             CoverageTraceCmp | CoveragePCTable;
+         // Due to TLS differences, stack depth tracking is only enabled on Linux
+-        if (TC.getTriple().isOSLinux())
++        if (TC.getTriple().isOSLinux() || TC.getTriple().isOSPlaybit())
+           CoverageFeatures |= CoverageStackDepth;
+       }
+ 
+@@ -699,7 +699,7 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
+     MsanParamRetval = Args.hasFlag(
+         options::OPT_fsanitize_memory_param_retval,
+         options::OPT_fno_sanitize_memory_param_retval, MsanParamRetval);
+-    NeedPIE |= !(TC.getTriple().isOSLinux() &&
++    NeedPIE |= !((TC.getTriple().isOSLinux() || TC.getTriple().isOSPlaybit()) &&
+                  TC.getTriple().getArch() == llvm::Triple::x86_64);
+   } else if (AllAddedKinds & SanitizerKind::KernelMemory) {
+     MsanUseAfterDtor = false;
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index 8dafc3d48..068a9c204 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -172,7 +172,8 @@ bool ToolChain::useRelaxRelocations() const {
+ }
+ 
+ bool ToolChain::defaultToIEEELongDouble() const {
+-  return PPC_LINUX_DEFAULT_IEEELONGDOUBLE && getTriple().isOSLinux();
++  return PPC_LINUX_DEFAULT_IEEELONGDOUBLE &&
++         (getTriple().isOSLinux() || getTriple().isOSPlaybit());
+ }
+ 
+ static void getAArch64MultilibFlags(const Driver &D,
+diff --git a/clang/lib/Driver/ToolChains/Arch/ARM.cpp b/clang/lib/Driver/ToolChains/Arch/ARM.cpp
+index 1893bde99..5191f92b7 100644
+--- a/clang/lib/Driver/ToolChains/Arch/ARM.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/ARM.cpp
+@@ -890,7 +890,7 @@ fp16_fml_fallthrough:
+           Triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v6m)
+         Features.push_back("+strict-align");
+     } else if (Triple.isOSLinux() || Triple.isOSNaCl() ||
+-               Triple.isOSWindows()) {
++               Triple.isOSWindows() || Triple.isOSPlaybit()) {
+       if (VersionNum < 7)
+         Features.push_back("+strict-align");
+     } else
+diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
+index 47ec36b3a..9cf2f3cba 100644
+--- a/clang/lib/Driver/ToolChains/Clang.cpp
++++ b/clang/lib/Driver/ToolChains/Clang.cpp
+@@ -467,7 +467,7 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
    }
  
-   llvm_unreachable("Invalid OSType");
-@@ -601,6 +602,7 @@ static Triple::OSType parseOS(StringRef OSName) {
-     .StartsWith("cuda", Triple::CUDA)
-     .StartsWith("nvcl", Triple::NVCL)
-     .StartsWith("amdhsa", Triple::AMDHSA)
-+    .StartsWith("playbit", Triple::Playbit)
-     .StartsWith("ps4", Triple::PS4)
-     .StartsWith("ps5", Triple::PS5)
-     .StartsWith("elfiamcu", Triple::ELFIAMCU)
+   if (Triple.isOSLinux() || Triple.getOS() == llvm::Triple::CloudABI ||
+-      Triple.isOSHurd()) {
++      Triple.isOSHurd() || Triple.isOSPlaybit()) {
+     switch (Triple.getArch()) {
+     // Don't use a frame pointer on linux if optimizing for certain targets.
+     case llvm::Triple::arm:
+@@ -3472,7 +3472,8 @@ static void RenderSCPOptions(const ToolChain &TC, const ArgList &Args,
+                              ArgStringList &CmdArgs) {
+   const llvm::Triple &EffectiveTriple = TC.getEffectiveTriple();
+ 
+-  if (!EffectiveTriple.isOSFreeBSD() && !EffectiveTriple.isOSLinux())
++  if (!EffectiveTriple.isOSFreeBSD() && !EffectiveTriple.isOSLinux() &&
++      !EffectiveTriple.isOSPlaybit())
+     return;
+ 
+   if (!EffectiveTriple.isX86() && !EffectiveTriple.isSystemZ() &&
+diff --git a/clang/lib/Lex/InitHeaderSearch.cpp b/clang/lib/Lex/InitHeaderSearch.cpp
+index 41382d7cb..13f4edccd 100644
+--- a/clang/lib/Lex/InitHeaderSearch.cpp
++++ b/clang/lib/Lex/InitHeaderSearch.cpp
+@@ -234,6 +234,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
+     case llvm::Triple::CloudABI:
+     case llvm::Triple::NaCl:
+     case llvm::Triple::ELFIAMCU:
++    case llvm::Triple::Playbit:
+       break;
+     case llvm::Triple::Win32:
+       if (triple.getEnvironment() != llvm::Triple::Cygnus)
+@@ -336,6 +337,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
+   case llvm::Triple::RTEMS:
+   case llvm::Triple::NaCl:
+   case llvm::Triple::ELFIAMCU:
++  case llvm::Triple::Playbit:
+     break;
+   default:
+     AddPath("/usr/include", ExternCSystem, false);

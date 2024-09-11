@@ -1,0 +1,28 @@
+Playbit target
+
+diff --git a/lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp b/lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp
+index bf3c5ddd5..def23d98e 100644
+--- a/lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp
++++ b/lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp
+@@ -813,8 +813,8 @@ static lldb::addr_t ReadLinuxProcessAddressMask(lldb::ProcessSP process_sp,
+ 
+ lldb::addr_t ABISysV_arm64::FixCodeAddress(lldb::addr_t pc) {
+   if (lldb::ProcessSP process_sp = GetProcessSP()) {
+-    if (process_sp->GetTarget().GetArchitecture().GetTriple().isOSLinux() &&
+-        !process_sp->GetCodeAddressMask())
++    const llvm::Triple &T = process_sp->GetTarget().GetArchitecture().GetTriple();
++    if ((T.isOSLinux() || T.isOSPlaybit()) && !process_sp->GetCodeAddressMask())
+       process_sp->SetCodeAddressMask(
+           ReadLinuxProcessAddressMask(process_sp, "code_mask"));
+ 
+@@ -825,8 +825,8 @@ lldb::addr_t ABISysV_arm64::FixCodeAddress(lldb::addr_t pc) {
+ 
+ lldb::addr_t ABISysV_arm64::FixDataAddress(lldb::addr_t pc) {
+   if (lldb::ProcessSP process_sp = GetProcessSP()) {
+-    if (process_sp->GetTarget().GetArchitecture().GetTriple().isOSLinux() &&
+-        !process_sp->GetDataAddressMask())
++    const llvm::Triple &T = process_sp->GetTarget().GetArchitecture().GetTriple();
++    if ((T.isOSLinux() || T.isOSPlaybit()) && !process_sp->GetDataAddressMask())
+       process_sp->SetDataAddressMask(
+           ReadLinuxProcessAddressMask(process_sp, "data_mask"));
+ 
