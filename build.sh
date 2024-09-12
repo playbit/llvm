@@ -418,6 +418,22 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   CFLAGS="$CFLAGS -isystem$S1_CLANGRES_DIR/include"  # compiler headers (e.g. stdint.h)
   CFLAGS_NOLTO=$CFLAGS
 
+  # system headers
+  case "$TARGET" in
+  *wasi|wasm*playbit)
+    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _wasi.sh
+    ;;
+  *linux|*playbit)
+    _run_if_missing "$SYSROOT/usr/include/linux/version.h" _linux-headers.sh
+    MUSL_ONLY_INSTALL_HEADERS=1
+    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _musl.sh
+    MUSL_ONLY_INSTALL_HEADERS=
+    ;;
+  *macos)
+    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _macos-sdk.sh
+    ;;
+  esac
+
   # builtins
   BUILTINS_DIR=$BUILD_DIR/builtins
   BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
@@ -426,17 +442,12 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
   LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
 
-  # libc and system headers
+  # libc (musl needs builtins)
   case "$TARGET" in
   *wasi|wasm*playbit)
-    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _wasi.sh
     ;;
   *linux|*playbit)
-    _run_if_missing "$SYSROOT/usr/include/linux/version.h" _linux-headers.sh
-    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _musl.sh
-    ;;
-  *macos)
-    _run_if_missing "$SYSROOT/usr/include/stdlib.h" _macos-sdk.sh
+    _run_if_missing "$SYSROOT/lib/libc.a" _musl.sh
     ;;
   esac
 

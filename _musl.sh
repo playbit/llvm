@@ -29,6 +29,11 @@ CC_TRIPLE=$(_clang_triple $TARGET)
   LDFLAGS="$LDFLAGS -Wl,-soname,libc.so $BUILTINS_DIR/lib/libclang_rt.builtins.a" \
   CROSS_COMPILE=$LLVM_STAGE1_DIR/bin/
 
+if [ "${MUSL_ONLY_INSTALL_HEADERS:-}" = "1" ]; then
+  make DESTDIR="$SYSROOT" install-headers
+  exit 0
+fi
+
 if $ENABLE_EXECINFO; then
   # install headers
   make DESTDIR=install1 install-headers
