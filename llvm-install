@@ -3,7 +3,9 @@ set -eo pipefail
 
 LLVM_VERSION=${LLVM_VERSION:-17.0.3}
 DESTDIR=${DESTDIR:-$HOME/llvm}
-NATIVE_TARGET=$(uname -m)-playbit
+ARCH="$(uname -m)"
+[ "$ARCH" = "arm64" ] && ARCH=aarch64  # [macOS]
+NATIVE_TARGET=$ARCH-playbit
 TARGETS=${TARGETS:-aarch64-playbit x86_64-playbit wasm32-playbit}
 NOW=$(date -u +%Y%m%d%H%M%S)
 
