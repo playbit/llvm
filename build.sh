@@ -10,6 +10,8 @@ TOOLCHAIN_TARGETS=(
   x86_64-macos \
   aarch64-playbit \
   x86_64-playbit \
+  aarch64-linux \
+  x86_64-linux \
 )
 # targets to build sysroots for
 SYSROOT_TARGETS=(
@@ -370,7 +372,10 @@ _cc_triples_list() {
   local CC_TRIPLES=()
   local TARGET
   for TARGET in ${SYSROOT_TARGETS[@]}; do
-    CC_TRIPLES+=( $(_clang_triple $TARGET) )
+    case "$TARGET" in
+      *linux) ;; # shared with *playbit
+      *) CC_TRIPLES+=( $(_clang_triple $TARGET) ) ;;
+    esac
   done
   _array_join ";" ${CC_TRIPLES[@]}
 }
@@ -532,6 +537,8 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   echo "Using compiler-rt at ${COMPILER_RT_DIR##$PWD0/}/lib/"
 done
 
+
+
 for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   echo "~~~~~~~~~~~~~~~~~~~~ toolchain $TARGET ~~~~~~~~~~~~~~~~~~~~"
   _setenv_for_target $TARGET
@@ -554,35 +561,58 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
     CFLAGS="$CFLAGS -O2 -fPIC"
   fi
 
-  # zlib
   ZLIB_DIR=$BUILD_DIR/zlib
-  _run_if_missing "$ZLIB_DIR/lib/libz.a" _zlib.sh
-  echo "Using libz.a at ${ZLIB_DIR##$PWD0/}/"
-
-  # zstd
   ZSTD_DIR=$BUILD_DIR/zstd
-  _run_if_missing "$ZSTD_DIR/lib/libzstd.a" _zstd.sh
-  echo "Using libzstd.a at ${ZSTD_DIR##$PWD0/}/"
-
-  # libxml2
   LIBXML2_DIR=$BUILD_DIR/libxml2
-  _run_if_missing "$LIBXML2_DIR/lib/libxml2.a" _libxml2.sh
-  echo "Using libxml2.a at ${LIBXML2_DIR##$PWD0/}/"
-
-  # ncurses
   NCURSES_DIR=$BUILD_DIR/ncurses
-  _run_if_missing "$NCURSES_DIR/lib/libncurses.a" _ncurses.sh
-  echo "Using libncurses.a at ${NCURSES_DIR##$PWD0/}/"
-
-  # libedit
   LIBEDIT_DIR=$BUILD_DIR/libedit
-  _run_if_missing "$LIBEDIT_DIR/lib/libedit.a" _libedit.sh
-  echo "Using libedit.a at ${LIBEDIT_DIR##$PWD0/}/"
-
-  # xz
   XZ_DIR=$BUILD_DIR/xz
-  _run_if_missing "$XZ_DIR/lib/liblzma.a" _xz.sh
-  echo "Using liblzma.a at ${XZ_DIR##$PWD0/}/"
+
+  # ARCH-linux shares most parts with ARCH-playbit
+  if [[ "$TARGET" == *linux ]]; then
+    ARCH=${TARGET%%-*}
+    mkdir -p "$BUILD_DIR"
+    for dir in \
+      builtins \
+      builtins-for-s1-cc \
+      sysroot \
+      compiler-rt \
+      libcxx \
+      zlib \
+      zstd \
+      libxml2 \
+      ncurses \
+      libedit \
+      xz \
+    ;do
+      rm -f "$BUILD_DIR/$dir"
+      ln -s "../$ARCH-playbit/$dir" "$BUILD_DIR/$dir"
+    done
+  else
+    # zlib
+    _run_if_missing "$ZLIB_DIR/lib/libz.a" _zlib.sh
+    echo "Using libz.a at ${ZLIB_DIR##$PWD0/}/"
+
+    # zstd
+    _run_if_missing "$ZSTD_DIR/lib/libzstd.a" _zstd.sh
+    echo "Using libzstd.a at ${ZSTD_DIR##$PWD0/}/"
+
+    # libxml2
+    _run_if_missing "$LIBXML2_DIR/lib/libxml2.a" _libxml2.sh
+    echo "Using libxml2.a at ${LIBXML2_DIR##$PWD0/}/"
+
+    # ncurses
+    _run_if_missing "$NCURSES_DIR/lib/libncurses.a" _ncurses.sh
+    echo "Using libncurses.a at ${NCURSES_DIR##$PWD0/}/"
+
+    # libedit
+    _run_if_missing "$LIBEDIT_DIR/lib/libedit.a" _libedit.sh
+    echo "Using libedit.a at ${LIBEDIT_DIR##$PWD0/}/"
+
+    # xz
+    _run_if_missing "$XZ_DIR/lib/liblzma.a" _xz.sh
+    echo "Using liblzma.a at ${XZ_DIR##$PWD0/}/"
+  fi
 
   # restore CFLAGS
   CFLAGS=$CFLAGS_TOOLS_SAVE

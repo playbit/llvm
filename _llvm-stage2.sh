@@ -6,14 +6,24 @@ DESTDIR=$LLVM_STAGE2_DIR
 ENABLE_STATIC_LINKING=$LLVM_ENABLE_STATIC_LINKING
 ENABLE_LLDB=true
 
-if [[ $TARGET == *macos* ]]; then
-  # enable static linking for macos for now since I can't figure out why:
-  #   ld64.lld: error: undefined symbol: __cxa_thread_atexit_impl
-  # even though we link with -lc++abi
-  ENABLE_STATIC_LINKING=true
-  # don't build lldb
-  ENABLE_LLDB=false
-fi
+case "$TARGET" in
+  *linux)
+    # The "ARCH-linux" target is different from "ARCH-playbit" in that it runs on any linux distro,
+    # thus we must use static linking.
+    ENABLE_STATIC_LINKING=true
+    # also disable lldb which otherwise fails with
+    #   "ld.lld: error: attempted static link of dynamic object lib/liblldb.so.17.0.3"
+    ENABLE_LLDB=false
+    ;;
+  *macos*)
+    # Enable static linking for macos for now since I can't figure out why:
+    #   ld64.lld: error: undefined symbol: __cxa_thread_atexit_impl
+    # even though we link with -lc++abi
+    ENABLE_STATIC_LINKING=true
+    # don't build lldb
+    ENABLE_LLDB=false
+    ;;
+esac
 
 DIST_COMPONENTS=(
   clang \
@@ -25,8 +35,12 @@ DIST_COMPONENTS=(
   llvm-as \
   llvm-config \
   llvm-cov \
+  llvm-dis \
   llvm-dlltool \
   llvm-dwarfdump \
+  llvm-libtool-darwin \
+  llvm-link \
+  llvm-lipo \
   llvm-nm \
   llvm-objcopy \
   llvm-objdump \
@@ -41,8 +55,6 @@ DIST_COMPONENTS=(
   llvm-symbolizer \
   llvm-tblgen \
   llvm-xray \
-  llvm-libtool-darwin \
-  llvm-lipo \
 )
 if $ENABLE_LLDB; then
   DIST_COMPONENTS+=( lldb lldb-server liblldb )
@@ -88,12 +100,12 @@ EXTRA_CMAKE_ARGS=( -Wno-dev )
 if $ENABLE_STATIC_LINKING; then
   if [[ $TARGET == *macos* ]]; then
     EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=OFF )
-    EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=OFF )
   else
     EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=ON )
-    EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=ON )
-    EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=OFF )
   fi
+  EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=OFF )
+  EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=OFF )
+  EXTRA_CMAKE_ARGS+=( -DCLANG_LINK_CLANG_DYLIB=OFF )
 else
   EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PIC=ON )
   EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=ON )
