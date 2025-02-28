@@ -33,6 +33,9 @@ rm -f "$DESTDIR/lib/libBlocksRuntime.a"
 mkdir -p "$DESTDIR/lib"
 $AR crs "$DESTDIR/lib/libBlocksRuntime.a" data.o runtime.o
 
+mkdir -p "$DESTDIR/usr/include"
+cp "$SRCDIR/Block.h" "$DESTDIR/usr/include/Block.h"
+
 set +x
 
 _popd

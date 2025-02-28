@@ -13,8 +13,9 @@ if [[ $TARGET != wasm* ]]; then
 fi
 
 if [ -e "$BLOCKSRUNTIME_DIR/lib/libBlocksRuntime.a" ]; then
-  mkdir -p $lib/clang/lib
+  mkdir -p $lib/clang/lib $lib/clang/include
   cp -v "$BLOCKSRUNTIME_DIR/lib/libBlocksRuntime.a" $lib/clang/lib
+  cp -v "$BLOCKSRUNTIME_DIR/usr/include/Block.h"    $lib/clang/include/Block.h
 fi
 
 case $TARGET in

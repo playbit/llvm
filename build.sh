@@ -549,6 +549,7 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
   BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
   LIBCXX_DIR=$BUILD_DIR/libcxx
   COMPILER_RT_DIR=$BUILD_DIR/compiler-rt
+  BLOCKSRUNTIME_DIR=$BUILD_DIR/blocks-runtime
 
   CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
   LDFLAGS="$LDFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
@@ -575,6 +576,7 @@ for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
     for dir in \
       builtins \
       builtins-for-s1-cc \
+      blocks-runtime \
       sysroot \
       compiler-rt \
       libcxx \
