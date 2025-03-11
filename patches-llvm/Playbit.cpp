@@ -335,8 +335,9 @@ Playbit::Playbit(const Driver &D, const llvm::Triple &targetTriple, const ArgLis
 
 
   // setup search paths
-  getFilePaths().clear(); // always empty; just in case it changes in future llvm
-  getLibraryPaths().clear(); // always empty; just in case it changes in future llvm
+  // always empty; just in case it changes in future llvm
+  getFilePaths().clear();
+  getLibraryPaths().clear();
 
   std::string compiler_rt_lib_path = fspath({ SysRoot, "lib", "clang", "lib" });
   // std::cout << "[pb] compiler_rt_lib_path: " << compiler_rt_lib_path << std::endl;
@@ -432,6 +433,52 @@ void Playbit::addClangTargetOptions(const ArgList &DriverArgs,
 }
 
 
+void Playbit::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
+                                           ArgStringList &CC1Args) const {
+  if (DriverArgs.hasArg(options::OPT_nostdlibinc) ||
+      DriverArgs.hasArg(options::OPT_nostdincxx))
+    return;
+
+  // try <sysroot>/usr/include/c++/v1 (e.g. /sysroot/x86_64/usr/include/c++/v1)
+  std::string incPath = fspath({SysRoot, "usr/include/c++/v1"});
+  if (getVFS().exists(incPath)) {
+    addSystemInclude(DriverArgs, CC1Args, incPath);
+    return;
+  }
+
+  // try <sysroot>/include/c++/v1 (e.g. /sysroot/x86_64/include/c++/v1)
+  incPath = fspath({SysRoot, "include/c++/v1"});
+  if (getVFS().exists(incPath)) {
+    addSystemInclude(DriverArgs, CC1Args, incPath);
+    return;
+  }
+
+  // did not find C++ headers in sysroot; fall back to host system headers
+  if (getTriple().getArch() == llvm::Triple(llvm::sys::getDefaultTargetTriple()).getArch()) {
+    // try <sdk>/usr/include/c++/v1 (e.g. /a/b/usr/include/c++/v1 for /a/b/bin/clang)
+    const Driver &D = getDriver();
+    std::string sdkDir = std::string(parent_path(parent_path(D.getClangProgramPath())));
+    incPath = fspath({sdkDir, "/usr/include/c++/v1"});
+    if (getVFS().exists(incPath)) {
+      addSystemInclude(DriverArgs, CC1Args, incPath);
+      return;
+    }
+
+    // try root of file system
+    incPath = "/usr/include/c++/v1";
+    if (getVFS().exists(incPath)) {
+      addSystemInclude(DriverArgs, CC1Args, incPath);
+      return;
+    }
+    incPath = "/include/c++/v1";
+    if (getVFS().exists(incPath))
+      addSystemInclude(DriverArgs, CC1Args, incPath);
+
+    // give up
+  }
+}
+
+
 void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
                                         ArgStringList &CC1Args) const {
   const Driver &D = getDriver();
@@ -444,6 +491,8 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
   if (!DriverArgs.hasArg(options::OPT_nobuiltininc)) {
     SmallString<128> P(D.ResourceDir);
     llvm::sys::path::append(P, "include");
+    // "/bin/../lib/clang/include" -> "/lib/clang/include"
+    llvm::sys::path::remove_dots(P, /*remove_dot_dot*/true);
     addSystemInclude(DriverArgs, CC1Args, P);
   }
 
@@ -468,44 +517,46 @@ void Playbit::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
   //   return;
   // }
 
+  // try <sysroot>/usr/include (e.g. /sysroot/x86_64/usr/include)
   std::string incPath = fspath({SysRoot, "usr/include"});
   // std::cout << "[pb] incPath: " << incPath << std::endl;
   if (getVFS().exists(incPath)) {
     addExternCSystemInclude(DriverArgs, CC1Args, incPath);
   } else {
+    // try <sysroot>/include (e.g. /sysroot/x86_64/include)
     incPath = fspath({SysRoot, "include"});
     if (getVFS().exists(incPath))
       addExternCSystemInclude(DriverArgs, CC1Args, incPath);
   }
 
-  std::string sdkDir = std::string(parent_path(parent_path(D.getClangProgramPath())));
-  incPath = fspath({sdkDir, "/usr/include"});
-  if (getVFS().exists(incPath))
-    addExternCSystemInclude(DriverArgs, CC1Args, incPath);
-}
+  // if we are targeting the host, also include system-level headers
+  if (getTriple().str() == llvm::sys::getDefaultTargetTriple()) {
+    std::string sdkDir = std::string(parent_path(parent_path(D.getClangProgramPath())));
 
+    if (D.CCCIsCXX()) {
+      // try <sdk>/usr/include/c++/v1 (e.g. /a/b/usr/include/c++/v1 for /a/b/bin/clang)
+      incPath = fspath({sdkDir, "/usr/include/c++/v1"});
+      if (getVFS().exists(incPath))
+        addSystemInclude(DriverArgs, CC1Args, incPath);
+    }
 
-void Playbit::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
-                                        ArgStringList &CC1Args) const {
-  if (DriverArgs.hasArg(options::OPT_nostdlibinc) ||
-      DriverArgs.hasArg(options::OPT_nostdincxx))
-    return;
-
-  std::string incPath = fspath({SysRoot, "usr/include/c++/v1"});
-  if (getVFS().exists(incPath)) {
-    // SDK headers
-    addSystemInclude(DriverArgs, CC1Args, incPath);
-  } else {
-    incPath = fspath({SysRoot, "include/c++/v1"});
-    if (getVFS().exists(incPath))
-      addSystemInclude(DriverArgs, CC1Args, incPath);
+    // try <sdk>/usr/include (e.g. /a/b/usr/include for /a/b/bin/clang)
+    incPath = fspath({sdkDir, "/usr/include"});
+    if (getVFS().exists(incPath)) {
+      addExternCSystemInclude(DriverArgs, CC1Args, incPath);
+    } else {
+      // try /usr/include
+      incPath = "/usr/include";
+      if (getVFS().exists(incPath)) {
+        addExternCSystemInclude(DriverArgs, CC1Args, incPath);
+      } else {
+        // final attempt: /include
+        incPath = "/include";
+        if (getVFS().exists(incPath))
+          addExternCSystemInclude(DriverArgs, CC1Args, incPath);
+      }
+    }
   }
-
-  const Driver &D = getDriver();
-  std::string sdkDir = std::string(parent_path(parent_path(D.getClangProgramPath())));
-  incPath = fspath({sdkDir, "/usr/include/c++/v1"});
-  if (getVFS().exists(incPath))
-    addSystemInclude(DriverArgs, CC1Args, incPath);
 }
 
 
