@@ -5,9 +5,9 @@ rm -f test/icu_parse_test.xml  # no icu
 
 CONFIGURE_ARGS=()
 
-# if [ "$CHOST" != "$CBUILD" ]; then
-CONFIGURE_ARGS+=( --host=$HOST_TRIPLE --build=$(_clang_triple $TARGET) )
-# fi
+if [ -n "${TARGET:-}" ]; then
+  CONFIGURE_ARGS+=( --host=$HOST_TRIPLE --build=$(_clang_triple $TARGET) )
+fi
 
 if [ -n "${SYSROOT:-}" ]; then
   CONFIGURE_ARGS+=( --with-sysroot=$SYSROOT )

@@ -74,7 +74,7 @@ CFLAGS="$CFLAGS" \
   > configure.out
 
 echo "make > make.out"
-make -j$NCPU V=0 > make.out
+make -j$NCPU V=1 > make.out
 
 echo "make install > make-install.out"
 rm -rf "$NCURSES_DIR"
@@ -82,6 +82,7 @@ mkdir -p "$NCURSES_DIR"
 make DESTDIR="$NCURSES_DIR" install > make-install.out
 
 if [ ! -e "$NCURSES_DIR/lib/libncurses.a" ]; then
+  mkdir -p "$NCURSES_DIR/lib"
   _symlink "$NCURSES_DIR/lib/libncurses.a" libncursesw.a
 fi
 

@@ -186,14 +186,15 @@ if [ $HOST_ARCH = x86_64 ]; then
   STAGE1_CFLAGS+=( -march=native )
 fi
 if [ "$HOST_SYS" = "macos" ]; then
-  # -platform_version <platform> <min_version> <sdk_version>
   if [ $HOST_ARCH = x86_64 ]; then
     MAC_TARGET_VERSION=10.15
-    STAGE1_LDFLAGS+=( -Wl,-platform_version,macos,10.15,$MAC_SDK_VERSION )
   else
     MAC_TARGET_VERSION=11.0
-    STAGE1_LDFLAGS+=( -Wl,-platform_version,macos,11.0,$MAC_SDK_VERSION )
   fi
+  # -platform_version <platform> <min_version> <sdk_version>
+  STAGE1_LDFLAGS+=( -Wl,-platform_version,macos,$MAC_TARGET_VERSION,$MAC_SDK_VERSION )
+  STAGE1_CFLAGS+=( "-mmacosx-version-min=$MAC_TARGET_VERSION" )
+  STAGE1_CPPFLAGS+=( "-mmacosx-version-min=$MAC_TARGET_VERSION" )
 fi
 
 
@@ -235,7 +236,7 @@ _run_script() { # <script> [<label>]
   local LABEL=${2:-}
   [ -n "$LABEL" ] || LABEL=$SCRIPT
   echo "———————————————————————————— $LABEL ————————————————————————————"
-  ( source $SCRIPT )
+  ( set -euo pipefail; source $SCRIPT )
   echo "——————————————————————————————————————————————————————————————————————"
 }
 
@@ -388,9 +389,16 @@ _setenv_for_target() {
   CPPFLAGS="$GENERIC_CFLAGS --target=$CC_TRIPLE --sysroot=$SYSROOT"
   LDFLAGS="$GENERIC_LDFLAGS --target=$CC_TRIPLE --sysroot=$SYSROOT"
   case $TARGET in
-    aarch64-macos)   MAC_TARGET_VERSION=11.0; export MAC_TARGET_VERSION ;;
-    x86_64-macos)    MAC_TARGET_VERSION=10.15; export MAC_TARGET_VERSION ;;
+    aarch64-macos)   MAC_TARGET_VERSION=11.0 ;;
+    x86_64-macos)    MAC_TARGET_VERSION=10.15 ;;
     *linux|*playbit) LDFLAGS="$LDFLAGS -B$BUILD_DIR_S2/phony" ;;
+  esac
+  case $TARGET in
+    *-macos)
+      CFLAGS="$CFLAGS -mmacosx-version-min=$MAC_TARGET_VERSION"
+      LDFLAGS="$LDFLAGS -Wl,-platform_version,macos,$MAC_TARGET_VERSION,$MAC_SDK_VERSION"
+      export MAC_TARGET_VERSION
+      ;;
   esac
   export TARGET
   export BUILD_DIR
