@@ -307,16 +307,6 @@ HOST_CPPFLAGS=$CPPFLAGS
 HOST_LDFLAGS=$LDFLAGS
 HOST_TRIPLE=$($CC -print-target-triple)
 
-if [ -z "${TARGET+x}" ]; then
-  echo "Error: TARGET is not defined"
-  echo "  Available targets: ${SYSROOT_TARGETS[@]}"
-  echo ""
-  echo "  Re-run with:"
-  echo "    TARGET=${SYSROOT_TARGETS[0]} ./build.sh"
-  echo ""
-  exit 1
-fi
-
 BUILD_DIR=$BUILD_DIR_S1
 mkdir -p "$BUILD_DIR"
 
