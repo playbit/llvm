@@ -100,7 +100,6 @@ XZ_COMPRESSION_RATIO=8 # 0-9 (xz default is 6)
 #   8  39.2 MB  29.5s
 #   9  36.9 MB  55.2s
 
-
 # parse command line arguments
 while [[ $# -gt 0 ]]; do case "$1" in
   -h|--help)
@@ -250,6 +249,29 @@ _run_if_missing() { # <testfile> <script> [<label>]
   _run_script "$SCRIPT" "$LABEL"
 }
 
+_clang_triple() { # <TARGET>
+  # for s1 clang
+  case $1 in
+    aarch64-macos)   echo arm64-apple-darwin20;; # macOS 11
+    x86_64-macos)    echo x86_64-apple-darwin19;; # macOS 10
+    wasm*)           echo ${1%%-*}-unknown-wasi;;
+    *linux|*playbit) echo ${1%%-*}-unknown-linux-musl;;
+    *)               echo $1 ;;
+  esac
+}
+
+_cc_triples_list() {
+  local CC_TRIPLES=()
+  local TARGET
+  for TARGET in ${SYSROOT_TARGETS[@]}; do
+    case "$TARGET" in
+      *linux) ;; # shared with *playbit
+      *) CC_TRIPLES+=( $(_clang_triple $TARGET) ) ;;
+    esac
+  done
+  _array_join ";" ${CC_TRIPLES[@]}
+}
+
 # ————————————————————————————————————————————————————————————————————————————
 # stage 1
 # Build clang for host with host libraries
@@ -284,6 +306,16 @@ HOST_CFLAGS=$CFLAGS
 HOST_CPPFLAGS=$CPPFLAGS
 HOST_LDFLAGS=$LDFLAGS
 HOST_TRIPLE=$($CC -print-target-triple)
+
+if [ -z "${TARGET+x}" ]; then
+  echo "Error: TARGET is not defined"
+  echo "  Available targets: ${SYSROOT_TARGETS[@]}"
+  echo ""
+  echo "  Re-run with:"
+  echo "    TARGET=${SYSROOT_TARGETS[0]} ./build.sh"
+  echo ""
+  exit 1
+fi
 
 BUILD_DIR=$BUILD_DIR_S1
 mkdir -p "$BUILD_DIR"
@@ -356,29 +388,6 @@ GENERIC_LDFLAGS="--rtlib=compiler-rt"
 HOST_TRIPLE=$($LLVM_STAGE1_DIR/bin/clang -print-target-triple)
 
 S1_CLANGRES_DIR=$(realpath $($LLVM_STAGE1_DIR/bin/clang --print-runtime-dir)/../..)
-
-_clang_triple() { # <TARGET>
-  # for s1 clang
-  case $1 in
-    aarch64-macos)   echo arm64-apple-darwin20;; # macOS 11
-    x86_64-macos)    echo x86_64-apple-darwin19;; # macOS 10
-    wasm*)           echo ${1%%-*}-unknown-wasi;;
-    *linux|*playbit) echo ${1%%-*}-unknown-linux-musl;;
-    *)               echo $1 ;;
-  esac
-}
-
-_cc_triples_list() {
-  local CC_TRIPLES=()
-  local TARGET
-  for TARGET in ${SYSROOT_TARGETS[@]}; do
-    case "$TARGET" in
-      *linux) ;; # shared with *playbit
-      *) CC_TRIPLES+=( $(_clang_triple $TARGET) ) ;;
-    esac
-  done
-  _array_join ";" ${CC_TRIPLES[@]}
-}
 
 _setenv_for_target() {
   TARGET=$1
