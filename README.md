@@ -80,3 +80,9 @@ To build everything, run `build.sh` without arguments:
 ```shell
 $ ./build.sh
 ```
+
+To build select hosts and targets specific versions:
+
+```shell
+$ ./build.sh --sysroot-target=aarch64-macos aarch64-macos
+```
