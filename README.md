@@ -86,3 +86,27 @@ To build select hosts and targets specific versions:
 ```shell
 $ ./build.sh --sysroot-target=aarch64-macos aarch64-macos
 ```
+
+## Developement
+
+When making changes and testing them in Playbit, you can use the `dev.sh` script:
+
+```shell
+./dev.sh
+```
+
+By default, this will re-apply all the patches and then rebuild LLVM.
+
+⚠️ NOTE: that you must delete the corresponding folder in `./built-target/aarch64-playbit/` to have your changes reflected.
+
+To make changes directly to the code test out your changes in Playbit quickly, run:
+
+```shell
+./dev.sh --no-patch
+```
+
+Otherwise, you can rebuild everything (but this will be much slower):
+
+```shell
+./dev.sh --clean
+```
