@@ -1,0 +1,17 @@
+diff --git a/compiler-rt/lib/asan/asan_thread.cpp b/compiler-rt/lib/asan/asan_thread.cpp
+index f718adf5e..a10d58135 100644
+--- a/compiler-rt/lib/asan/asan_thread.cpp
++++ b/compiler-rt/lib/asan/asan_thread.cpp
+@@ -324,10 +324,12 @@ void AsanThread::SetThreadStackAndTls(const InitOptions *options) {
+   tls_end_ = tls_begin_ + tls_size;
+   dtls_ = DTLS_Get();
+ 
++  #if 0
+   if (stack_top_ != stack_bottom_) {
+     int local;
+     CHECK(AddrIsInStack((uptr)&local));
+   }
++  #endif
+ }
+ 
+ #endif  // !SANITIZER_FUCHSIA
