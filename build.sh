@@ -436,6 +436,8 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   CFLAGS="$CFLAGS -isystem$SYSROOT/usr/include"
   CFLAGS="$CFLAGS -isystem$S1_CLANGRES_DIR/include"  # compiler headers (e.g. stdint.h)
   CFLAGS_NOLTO=$CFLAGS
+  BUILTINS_DIR=$BUILD_DIR/builtins
+  BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
 
   # system headers
   case "$TARGET" in
@@ -454,8 +456,6 @@ for TARGET in ${SYSROOT_TARGETS[@]}; do
   esac
 
   # builtins
-  BUILTINS_DIR=$BUILD_DIR/builtins
-  BUILTINS_DIR_FOR_S1_CC=$BUILD_DIR/builtins-for-s1-cc
   _run_if_missing "$BUILTINS_DIR/lib/libclang_rt.builtins.a" _builtins.sh
   echo "Using builtins.a at ${BUILTINS_DIR##$PWD0/}"
   CFLAGS="$CFLAGS -resource-dir=$BUILTINS_DIR_FOR_S1_CC/"
@@ -704,7 +704,7 @@ _create_package() { # <package-name> <script>
     fi
   fi
 
-  source "$SCRIPT"
+  set -euo pipefail; source "$SCRIPT"
 
   # remove empty directories
   find . -type d -empty -delete
