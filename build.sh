@@ -83,7 +83,9 @@ PRINT_CONFIG=false
 ENABLE_LTO=true
 REBUILD_LLVM=false
 NO_PACKAGE=false
+NO_ARCHIVE=false
 NO_CLEANUP=false
+NO_NATIVE_TOOLCHAIN=false
 ONLY_TOOLCHAIN_TARGETS=()
 ONLY_SYSROOT_TARGETS=()
 
@@ -109,7 +111,10 @@ options:
   --print-config  Print configuration and exit (don't build anything)
   --no-lto        Disable LTO
   --no-package    Don't create package of final product (useful when debugging)
+  --no-archive    Don't create package archives (saves time when debugging)
   --no-cleanup    Don't remove temporary build directories after successful builds
+  --no-native-toolchain
+                  Don't setup local toolchain at packages/toolchain
   --compress=<r>  Use this xz compression ratio [0-9] for packages (default: $XZ_COMPRESSION_RATIO)
   --rebuild-llvm  Incrementally (re)build llvm stage 2 even if it's up to date
   --sysroot-target=<target>
@@ -125,7 +130,9 @@ _HELP_
   --print-config) PRINT_CONFIG=true; shift ;;
   --no-lto) ENABLE_LTO=false; shift ;;
   --no-package) NO_PACKAGE=true; shift ;;
+  --no-archive) NO_ARCHIVE=true; shift ;;
   --no-cleanup) NO_CLEANUP=true; shift ;;
+  --no-native-toolchain) NO_NATIVE_TOOLCHAIN=true; shift ;;
   --rebuild-llvm) REBUILD_LLVM=true; shift ;;
   --compress=*) XZ_COMPRESSION_RATIO=${1:11}; shift;;
   --sysroot-target=*) ONLY_SYSROOT_TARGETS+=( ${1:17} ); shift;;
@@ -706,6 +713,10 @@ _create_package() { # <package-name> <script>
     _popd
   fi
 
+  if $NO_ARCHIVE; then
+    return 0
+  fi
+
   echo "Creating ${PACKAGE_ARCHIVE##$PWD0/}"
   tar -c . | xz --compress -F xz -$XZ_COMPRESSION_RATIO \
                 --stdout --threads=0 \
@@ -731,34 +742,36 @@ done
 
 # create local test dir for native toolchain
 NATIVE_TOOLCHAIN=
-for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
-  [ $TARGET = "$HOST_ARCH-$HOST_SYS" ] || continue
-  echo "~~~~~~~~~~~~~~~~~~~~ setup native toolchain ~~~~~~~~~~~~~~~~~~~~"
-  unset _cpmerge
-  _cpmerge() {
-    echo "cpmerge ${1##$PWD0/} -> ${2##$PWD0/}"
-    $TOOLS/cpmerge "$@"
-  }
-  TOOLS_DIR=$PACKAGE_DIR_BASE/toolchain-$TARGET
-  NATIVE_TOOLCHAIN=$PACKAGE_DIR_BASE/toolchain
-  rm -rf "$NATIVE_TOOLCHAIN"
-  echo "copy ${TOOLS_DIR##$PWD0/}/ -> ${NATIVE_TOOLCHAIN##$PWD0/}/"
-  cp -a "$TOOLS_DIR" "$NATIVE_TOOLCHAIN"
-  for TARGET in ${SYSROOT_TARGETS[@]}; do
-    IFS=- read -r arch sys <<< "$TARGET"
-    if [ $sys = playbit ]; then
-      SUFFIX=/sysroot/$arch
-    else
-      SUFFIX=/sysroot/$sys/$arch
-    fi
-    DSTDIR=$NATIVE_TOOLCHAIN$SUFFIX
-    mkdir -p "$DSTDIR"
-    # note: must copy sysroot first since macos sysroot contains symlinks to usr
-    _cpmerge $PACKAGE_DIR_BASE/sysroot-$TARGET$SUFFIX     "$DSTDIR"
-    _cpmerge $PACKAGE_DIR_BASE/compiler-rt-$TARGET$SUFFIX "$DSTDIR"
-    _cpmerge $PACKAGE_DIR_BASE/libcxx-$TARGET$SUFFIX      "$DSTDIR"
+if ! $NO_NATIVE_TOOLCHAIN; then
+  for TARGET in ${TOOLCHAIN_TARGETS[@]}; do
+    [ $TARGET = "$HOST_ARCH-$HOST_SYS" ] || continue
+    echo "~~~~~~~~~~~~~~~~~~~~ setup native toolchain ~~~~~~~~~~~~~~~~~~~~"
+    unset _cpmerge
+    _cpmerge() {
+      echo "cpmerge ${1##$PWD0/} -> ${2##$PWD0/}"
+      $TOOLS/cpmerge "$@"
+    }
+    TOOLS_DIR=$PACKAGE_DIR_BASE/toolchain-$TARGET
+    NATIVE_TOOLCHAIN=$PACKAGE_DIR_BASE/toolchain
+    rm -rf "$NATIVE_TOOLCHAIN"
+    echo "copy ${TOOLS_DIR##$PWD0/}/ -> ${NATIVE_TOOLCHAIN##$PWD0/}/"
+    cp -a "$TOOLS_DIR" "$NATIVE_TOOLCHAIN"
+    for TARGET in ${SYSROOT_TARGETS[@]}; do
+      IFS=- read -r arch sys <<< "$TARGET"
+      if [ $sys = playbit ]; then
+        SUFFIX=/sysroot/$arch
+      else
+        SUFFIX=/sysroot/$sys/$arch
+      fi
+      DSTDIR=$NATIVE_TOOLCHAIN$SUFFIX
+      mkdir -p "$DSTDIR"
+      # note: must copy sysroot first since macos sysroot contains symlinks to usr
+      _cpmerge $PACKAGE_DIR_BASE/sysroot-$TARGET$SUFFIX     "$DSTDIR"
+      _cpmerge $PACKAGE_DIR_BASE/compiler-rt-$TARGET$SUFFIX "$DSTDIR"
+      _cpmerge $PACKAGE_DIR_BASE/libcxx-$TARGET$SUFFIX      "$DSTDIR"
+    done
   done
-done
+fi
 
 # test native toolchain
 if [ -n "$NATIVE_TOOLCHAIN" ]; then
@@ -782,10 +795,7 @@ if [ -n "$NATIVE_TOOLCHAIN" ]; then
   done
 fi
 
-#TAG=$(date -u +%Y%m%d%H%M%S)
-echo
-echo "You can upload the archives to files.playb.it: ./upload-packages.sh"
-# for f in $PACKAGE_DIR_BASE/llvm-$LLVM_VERSION-*.tar.xz; do
-#   UPLOAD_PATH=$(basename "$f")
-#   echo "  webfiles cp -v --sha256 ${f##$PWD0/} $UPLOAD_PATH"
-# done
+if ! $NO_ARCHIVE; then
+  echo
+  echo "You can upload the archives to files.playb.it: ./upload-packages.sh"
+fi
