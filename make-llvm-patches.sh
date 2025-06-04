@@ -174,6 +174,11 @@ mkpatch lldb-playbit.patch \
 	"Playbit target" \
 	lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp \
 
+mkpatch compiler-rt-disable-stack-check.patch \
+	"Fixes a crash in ASAN when starting a second thread.
+This is a quick-fix to prevent the crash." \
+	compiler-rt/lib/asan/asan_thread.cpp \
+
 
 # Note: Playbit toolchain is maintained as separate source files, Playbit.{cpp,h}
 

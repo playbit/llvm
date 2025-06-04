@@ -1,3 +1,6 @@
+Fixes a crash in ASAN when starting a second thread.
+This is a quick-fix to prevent the crash.
+
 diff --git a/compiler-rt/lib/asan/asan_thread.cpp b/compiler-rt/lib/asan/asan_thread.cpp
 index f718adf5e..a10d58135 100644
 --- a/compiler-rt/lib/asan/asan_thread.cpp
