@@ -95,17 +95,17 @@ When making changes and testing them in Playbit, you can use the `dev.sh` script
 ./dev.sh
 ```
 
-By default, this will re-apply all the patches and then rebuild LLVM.
+This will rebuild LLVM with your local changes (for example to `build/s2-llvm-17.0.3`) and then copy them into a sibling directory `playbit/llvm`.
 
 ⚠️ NOTE: that you must delete the corresponding folder in `./built-target/aarch64-playbit/` to have your changes reflected.
 
-To make changes directly to the code test out your changes in Playbit quickly, run:
+To reapply patches before building, run:
 
 ```shell
-./dev.sh --no-patch
+./dev.sh --patch
 ```
 
-Otherwise, you can rebuild everything (but this will be much slower):
+To rebuild everything (but this will be much slower):
 
 ```shell
 ./dev.sh --clean

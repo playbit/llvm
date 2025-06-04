@@ -1,12 +1,24 @@
 #!/bin/bash
 
-NO_PATCH=false
+PATCH=false
 CLEAN=false
+SLOW=false
 
 while [[ $# -gt 0 ]]; do case "$1" in
-  --no-patch) NO_PATCH=true; shift ;;
+  -h|--help)
+    cat <<- _HELP_
+usage: $0 [options]
+options:
+  --patch         Run llvm-reapply-patches.sh (uesful for testing out new patches)
+  --clean         Clean build artifacts (slow!)
+  --slow          Disables extra flags to build.sh to speed up iteration time
+  -h, --help      Show help and exit
+_HELP_
+    exit ;;
+  --patch) PATCH=true; shift ;;
   --clean) CLEAN=true; shift ;;
-  -*) _err "unknown option $1 (see $0 -help)" ;;
+  --slow)  SLOW=true; shift ;;
+  -*) echo "unknown option $1 (see $0 --help)" >&2; exit 1; ;;
 esac; done
 
 if $CLEAN; then
@@ -14,11 +26,15 @@ if $CLEAN; then
     rm -rf ./packages
 fi
 
-if ! $NO_PATCH; then
-    echo ./llvm-reapply-patches.sh
+if $PATCH; then
+    ./llvm-reapply-patches.sh
 fi
 
-./build.sh --sysroot-target=aarch64-playbit aarch64-playbit --no-cleanup --no-archive --no-native-toolchain --rebuild-llvm
+flags="--no-cleanup --no-archive --no-native-toolchain"
+if $SLOW; then
+    flags=""
+fi
+./build.sh --sysroot-target=aarch64-playbit aarch64-playbit $flags --rebuild-llvm
 
 rm -rf ../playbit/llvm/*
 mkdir -p ../playbit/llvm
