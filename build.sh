@@ -718,9 +718,9 @@ _create_package() { # <package-name> <script>
   fi
 
   echo "Creating ${PACKAGE_ARCHIVE##$PWD0/}"
-  tar -c . | xz --compress -F xz -$XZ_COMPRESSION_RATIO \
-                --stdout --threads=0 \
-           > "$PACKAGE_ARCHIVE"
+  tar -c --no-xattrs . \
+  | xz --compress -F xz -$XZ_COMPRESSION_RATIO --stdout --threads=0 \
+  > "$PACKAGE_ARCHIVE"
 }
 
 # make sure cpmerge is available
