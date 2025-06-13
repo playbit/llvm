@@ -174,10 +174,16 @@ mkpatch lldb-playbit.patch \
 	"Playbit target" \
 	lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp \
 
-mkpatch compiler-rt-disable-stack-check.patch \
-	"Fixes a crash in ASAN when starting a second thread.
-This is a quick-fix to prevent the crash." \
-	compiler-rt/lib/asan/asan_thread.cpp \
+mkpatch compiler-rt-fix-musl-stack-bug.patch \
+	"Fixes a crash in ASAN when starting a thread.
+
+The problem is that ThreadDescriptorSizeFallback only handles glibc.
+Returning too large of a value here causes the overlapping logic in GetThreadStackAndTls to be triggered, which causes the crash.
+Other possible fixes include returning 0, 0 from GetTls or commenting out the tcb_size adjustment for arm.
+
+See: https://github.com/playbit/playbit/issues/19
+" \
+    compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp \
 
 
 # Note: Playbit toolchain is maintained as separate source files, Playbit.{cpp,h}
