@@ -718,7 +718,8 @@ _create_package() { # <package-name> <script>
   fi
 
   echo "Creating ${PACKAGE_ARCHIVE##$PWD0/}"
-  tar -c --no-xattrs . \
+  xattr -rc .
+  tar -c --no-xattrs --exclude='._*' . \
   | xz --compress -F xz -$XZ_COMPRESSION_RATIO --stdout --threads=0 \
   > "$PACKAGE_ARCHIVE"
 }
