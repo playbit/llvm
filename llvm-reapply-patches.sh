@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
-cd "$(dirname "$0")/build/s2-llvm-17.0.3"
+eval $(grep -E '^LLVM_VERSION=' build.sh)
+cd "$(dirname "$0")/build/s2-llvm-$LLVM_VERSION"
 
 git reset --hard patch1~1
 for f in $(echo ../../patches-llvm/*.patch); do
