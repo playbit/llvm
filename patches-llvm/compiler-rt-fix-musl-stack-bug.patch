@@ -8,7 +8,7 @@ See: https://github.com/playbit/playbit/issues/19
 
 
 diff --git a/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp b/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp
-index 42013f471..e77aecde7 100644
+index 42013f471..e3cb11f95 100644
 --- a/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp
 +++ b/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp
 @@ -226,6 +226,11 @@ static atomic_uintptr_t thread_descriptor_size;
@@ -16,9 +16,9 @@ index 42013f471..e77aecde7 100644
  static uptr ThreadDescriptorSizeFallback() {
    uptr val = 0;
 +
-+#ifdef MUSL_VERSION
++#if defined(_LIBCPP_HAS_MUSL_LIBC)
 +  val = 200; // sizeof(pthread) in pthread_impl.h
-+#else // MUSL_VERSION
++#else // defined(_LIBCPP_HAS_MUSL_LIBC)
 +
  #if defined(__x86_64__) || defined(__i386__) || defined(__arm__)
    int major;
@@ -28,7 +28,7 @@ index 42013f471..e77aecde7 100644
    val = 1776; // from glibc.ppc64le 2.20-8.fc21
  #endif
 +
-+#endif // MUSL_VERSION
++#endif // defined(_LIBCPP_HAS_MUSL_LIBC)
 +
    return val;
  }
