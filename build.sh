@@ -249,14 +249,21 @@ _run_script() { # <script> [<label>]
   echo "——————————————————————————————————————————————————————————————————————"
 }
 
+_is_missing() { # <testfile> <script>
+  local TESTFILE=$1
+  local SCRIPT=$2
+  [ ! -e "$TESTFILE" ] || [ $REBUILD_LLVM = true -a "$SCRIPT" = _llvm-stage2.sh ]
+}
+
 _run_if_missing() { # <testfile> <script> [<label>]
   local TESTFILE=$1
   local SCRIPT=$2
   local LABEL=${3:-}
-  if [ -e "$TESTFILE" ] && ! [ $REBUILD_LLVM = true -a $SCRIPT = _llvm-stage2.sh ]; then
+  if _is_missing "$TESTFILE" "$SCRIPT"; then
+    _run_script "$SCRIPT" "$LABEL"
+  else
     return 0
   fi
-  _run_script "$SCRIPT" "$LABEL"
 }
 
 _clang_triple() { # <TARGET>
@@ -425,7 +432,35 @@ _setenv_for_target() {
 # working on llvm patches.
 LLVM_SRC_CHANGE_TRACKING_ENABLED=true
 LLVM_STAGE2_SRC=$BUILD_DIR_GENERIC/s2-llvm-$LLVM_VERSION
-_run_if_missing "$LLVM_STAGE2_SRC/LICENSE.TXT" _llvm-stage2-source.sh "llvm source"
+if _is_missing "$LLVM_STAGE2_SRC/LICENSE.TXT" _llvm-stage2-source.sh; then
+  _run_script _llvm-stage2-source.sh "llvm source"
+  touch "$LLVM_STAGE2_SRC/LICENSE.TXT"
+else
+  # check if patches changed
+  CANARY=$LLVM_STAGE2_SRC/LICENSE.TXT
+  if [ -f $LLVM_STAGE2_SRC/.git/refs/tags/patch1 ]; then
+    CANARY=$LLVM_STAGE2_SRC/.git/refs/tags/patch1
+  fi
+  echo "Checking for changes to LLVM patches"
+  NEWER=$(find "$LLVM_PATCHDIR" -type f -newer "$CANARY")
+  if [ -n "$NEWER" ]; then
+    if [ -f $LLVM_STAGE2_SRC/.git/refs/tags/patch1 ]; then
+      echo "—————————————————————————————————————————————————————" >&2
+      echo "LLVM patches changed:" >&2
+      echo "$NEWER" >&2
+      echo "" >&2
+      echo "Please:" >&2
+      echo "1. Check for any changes you might have made to LLVM and create or update patches." >&2
+      echo "2. Run ./llvm-reapply-patches.sh" >&2
+      echo "—————————————————————————————————————————————————————" >&2
+      exit 1
+    else
+      echo "LLVM patches changed"
+      _run_script _llvm-stage2-source.sh "llvm source"
+      touch "$LLVM_STAGE2_SRC/LICENSE.TXT"
+    fi
+  fi
+fi
 echo "Using llvm source at ${LLVM_STAGE1_SRC##$PWD0/}"
 
 # —————————————————————————————————————————————————————————————————————————————
