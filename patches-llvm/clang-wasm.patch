@@ -1,7 +1,7 @@
 WebAssembly toolchain
 
 diff --git a/clang/lib/Driver/ToolChains/WebAssembly.cpp b/clang/lib/Driver/ToolChains/WebAssembly.cpp
-index 36bed3166..ff4374dbb 100644
+index 36bed3166..3ecd055df 100644
 --- a/clang/lib/Driver/ToolChains/WebAssembly.cpp
 +++ b/clang/lib/Driver/ToolChains/WebAssembly.cpp
 @@ -51,7 +51,10 @@ std::string wasm::Linker::getLinkerPath(const ArgList &Args) const {
@@ -16,3 +16,14 @@ index 36bed3166..ff4374dbb 100644
  }
  
  void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
+@@ -123,8 +126,9 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
+     }
+ 
+     CmdArgs.push_back("-lc");
+-    AddRunTimeLibs(ToolChain, ToolChain.getDriver(), CmdArgs, Args);
+   }
++  if (!Args.hasArg(options::OPT_nodefaultlibs))
++    AddRunTimeLibs(ToolChain, ToolChain.getDriver(), CmdArgs, Args);
+ 
+   CmdArgs.push_back("-o");
+   CmdArgs.push_back(Output.getFilename());
