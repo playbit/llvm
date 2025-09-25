@@ -23,8 +23,8 @@ SYSROOT_TARGETS=(
 )
 
 PKG_VERSION=2
-LLVM_VERSION=17.0.3
-LLVM_SHA256=be5a1e44d64f306bb44fce7d36e3b3993694e8e6122b2348608906283c176db8
+LLVM_VERSION=21.1.1
+LLVM_SHA256=8863980e14484a72a9b7d2c80500e1749054d74f08f8c5102fd540a3c5ac9f8a
 LLVM_URL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VERSION/llvm-project-$LLVM_VERSION.src.tar.xz
 LLVM_PATCHDIR=$PWD/patches-llvm
 
@@ -57,8 +57,8 @@ LIBXML2_VERSION=2.11.5
 LIBXML2_SHA256=3727b078c360ec69fa869de14bd6f75d7ee8d36987b071e6928d4720a28df3a6
 LIBXML2_URL=https://download.gnome.org/sources/libxml2/${LIBXML2_VERSION%.*}/libxml2-$LIBXML2_VERSION.tar.xz
 
-NCURSES_VERSION=6.5-20241207
-NCURSES_SHA256=b2a1ef3574a191763b0bd19d169c4e6bd235aa25707ef26286c9ba6dbf2e6f82
+NCURSES_VERSION=6.5-20250920
+NCURSES_SHA256=85eddc5a765b0d580b39db3edb49152afdbb816e3a84359a04dadccf4e13e14e
 NCURSES_URL=https://invisible-mirror.net/archives/ncurses/current/ncurses-${NCURSES_VERSION}.tgz
 
 LIBEDIT_VERSION=20240517-3.1
@@ -394,7 +394,7 @@ GENERIC_LDFLAGS="--rtlib=compiler-rt"
 # GENERIC_LDFLAGS="--rtlib=compiler-rt --ld-path=$LLVM_STAGE1_DIR/bin/ld.lld"
 HOST_TRIPLE=$($LLVM_STAGE1_DIR/bin/clang -print-target-triple)
 
-S1_CLANGRES_DIR=$(realpath $($LLVM_STAGE1_DIR/bin/clang --print-runtime-dir)/../..)
+S1_CLANGRES_DIR=$(realpath $LLVM_STAGE1_DIR/lib/clang/21)
 
 _setenv_for_target() {
   TARGET=$1
@@ -430,7 +430,7 @@ _setenv_for_target() {
 # LLVM_SRC_CHANGE_TRACKING_ENABLED: if true, track changes to files in
 # LLVM_STAGE2_SRC via git. Slow and uses a lot of disk space but useful when
 # working on llvm patches.
-LLVM_SRC_CHANGE_TRACKING_ENABLED=true
+LLVM_SRC_CHANGE_TRACKING_ENABLED=false
 LLVM_STAGE2_SRC=$BUILD_DIR_GENERIC/s2-llvm-$LLVM_VERSION
 if _is_missing "$LLVM_STAGE2_SRC/LICENSE.TXT" _llvm-stage2-source.sh; then
   _run_script _llvm-stage2-source.sh "llvm source"

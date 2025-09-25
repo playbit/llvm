@@ -68,9 +68,9 @@ index 65bd6c6a7..229546118 100644
    return VersionTuple(13, 1);
  }
 @@ -439,6 +495,9 @@ void darwin::Linker::AddLinkArgs(Compilation &C, const ArgList &Args,
-   } else if (const Arg *A = Args.getLastArg(options::OPT_isysroot)) {
+   } else if (StringRef sysroot = C.getSysRoot(); sysroot != "") {
      CmdArgs.push_back("-syslibroot");
-     CmdArgs.push_back(A->getValue());
+     CmdArgs.push_back(C.getArgs().MakeArgString(sysroot));
 +  } else {
 +    CmdArgs.push_back("-syslibroot");
 +    CmdArgs.push_back(Args.MakeArgString(llvmsdk_sysroot(D, getToolChain().getTriple())));
@@ -80,7 +80,7 @@ index 65bd6c6a7..229546118 100644
 @@ -1253,7 +1312,10 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
                                bool IsShared) const {
    SmallString<64> DarwinLibName = StringRef("libclang_rt.");
-   // an Darwin the builtins compomnent is not in the library name
+   // On Darwin, the builtins component is not in the library name
 -  if (Component != "builtins") {
 +  if (Component == "builtins") {
 +    // builtins are only available as a static library
@@ -89,23 +89,6 @@ index 65bd6c6a7..229546118 100644
      DarwinLibName += Component;
      if (!(Opts & RLO_IsEmbedded))
        DarwinLibName += "_";
-@@ -1261,8 +1323,14 @@ void MachO::AddLinkRuntimeLib(const ArgList &Args, ArgStringList &CmdArgs,
- 
-   DarwinLibName += getOSLibraryNameSuffix();
-   DarwinLibName += IsShared ? "_dynamic.dylib" : ".a";
--  SmallString<128> Dir(getDriver().ResourceDir);
--  llvm::sys::path::append(Dir, "lib", "darwin");
-+  SmallString<128> Dir = llvmsdk_sysroot(getDriver(), getTriple());
-+  llvm::sys::path::append(Dir, "usr", "lib", "clang", "lib");
-+  // if not found, fall back to Apple defaults: /path/to/clang/../../lib/clang/lib/darwin
-+  if (!getVFS().exists(Dir)) {
-+    Dir = getDriver().ResourceDir;
-+    llvm::sys::path::append(Dir, "lib", "darwin");
-+  }
-+
-   if (Opts & RLO_IsEmbedded)
-     llvm::sys::path::append(Dir, "macho_embedded");
- 
 @@ -1990,9 +2058,18 @@ std::string getOSVersion(llvm::Triple::OSType OS, const llvm::Triple &Triple,
    case llvm::Triple::MacOSX:
      // If there is no version specified on triple, and both host and target are
@@ -163,6 +146,6 @@ index 65bd6c6a7..229546118 100644
 +    CC1Args.push_back("-isysroot");
 +    CC1Args.push_back(sysrootx);
 +  }
- }
- 
- void Darwin::addClangCC1ASTargetOptions(
+
+   // Earlier versions of the darwin SDK have the C standard library headers
+   // all together in the Darwin module. That leads to module cycles with

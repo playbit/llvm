@@ -83,8 +83,8 @@ cmake -G Ninja -Wno-dev "$LLVM_STAGE1_SRC/llvm" \
   -DCMAKE_MODULE_LINKER_FLAGS="$CMAKE_LD_FLAGS" \
   \
   -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly" \
-  -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt;lldb" \
-  -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
+  -DLLVM_ENABLE_PROJECTS="clang;lld;lldb" \
+  -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind;compiler-rt" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]:-}")" \
   -DLLVM_ENABLE_MODULES=OFF \
   -DLLVM_ENABLE_BINDINGS=OFF \

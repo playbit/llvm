@@ -5,10 +5,10 @@ index 79ccd644a..f4c680f14 100644
 --- a/llvm/include/llvm/TargetParser/Triple.h
 +++ b/llvm/include/llvm/TargetParser/Triple.h
 @@ -225,7 +225,8 @@ public:
-     Emscripten,
-     ShaderModel, // DirectX ShaderModel
      LiteOS,
--    LastOSType = LiteOS
+     Serenity,
+     Vulkan, // Vulkan SPIR-V
+-    LastOSType = Vulkan
 +    Playbit,
 +    LastOSType = Playbit
    };
@@ -53,9 +53,9 @@ index a3d6a06af..c8a5d0802 100644
 --- a/llvm/lib/TargetParser/Triple.cpp
 +++ b/llvm/lib/TargetParser/Triple.cpp
 @@ -245,6 +245,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
-   case ZOS: return "zos";
-   case ShaderModel: return "shadermodel";
    case LiteOS: return "liteos";
+   case XROS: return "xros";
+   case Vulkan: return "vulkan";
 +  case Playbit: return "playbit";
    }
  
@@ -85,16 +85,6 @@ diff --git a/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp b/llvm/lib/T
 index a7b1953ce..c793eea77 100644
 --- a/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp
 +++ b/llvm/lib/Transforms/Instrumentation/InstrProfiling.cpp
-@@ -918,7 +918,8 @@ static bool needsRuntimeRegistrationOfSectionRange(const Triple &TT) {
-     return false;
-   // Use linker script magic to get data/cnts/name start/end.
-   if (TT.isOSAIX() || TT.isOSLinux() || TT.isOSFreeBSD() || TT.isOSNetBSD() ||
--      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows())
-+      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows() ||
-+      TT.isOSPlaybit())
-     return false;
- 
-   return true;
 @@ -1287,7 +1288,7 @@ void InstrProfiling::emitRegistration() {
  bool InstrProfiling::emitRuntimeHook() {
    // We expect the linker to be invoked with -u<hook_var> flag for Linux
@@ -112,7 +102,7 @@ index b5eff6f6f..42b0d2654 100644
    return (Host.isOSWindows() && llvm_is_multithreaded()) || Host.isOSDarwin() ||
           (Host.isX86() && Host.isOSLinux()) ||
           (Host.isOSLinux() && !Host.isAndroid()) ||
--         (Host.isSystemZ() && Host.isOSzOS());
+-         (Host.isSystemZ() && Host.isOSzOS()) || Host.isOSAIX();
 +         (Host.isSystemZ() && Host.isOSzOS()) ||
 +         Host.isOSPlaybit();
  #else

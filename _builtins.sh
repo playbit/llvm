@@ -46,6 +46,7 @@ GENERIC_SOURCES=( # cmake: GENERIC_SOURCES + GENERIC_TF_SOURCES
   divti3.c \
   extendsfdf2.c \
   extendhfsf2.c \
+  extendhfdf2.c \
   ffsdi2.c \
   ffssi2.c \
   ffsti2.c \
@@ -170,7 +171,7 @@ DARWIN_SOURCES=( # cmake: if (APPLE) GENERIC_SOURCES+=...
   atomic_thread_fence.c \
 )
 X86_ARCH_SOURCES=( # these files are used on 32-bit and 64-bit x86
-  cpu_model.c \
+  cpu_model/x86.c \
   i386/fp_mode.c \
 )
 # Implement extended-precision builtins, assuming long double is 80 bits.
@@ -285,7 +286,7 @@ ARM_EABI_SOURCES=(
 )
 # TODO: win32: ARM_MINGW_SOURCES
 AARCH64_SOURCES=(
-  cpu_model.c \
+  cpu_model/aarch64.c \
   aarch64/fp_mode.c \
   aarch64/lse.S \
 )
@@ -481,7 +482,7 @@ cat << _END > $NF
 ninja_required_version = 1.3
 builddir = build
 objdir = \$builddir/obj
-cflags = $CFLAGS -I.
+cflags = $CFLAGS -I. -I"$LLVM_STAGE2_SRC"/compiler-rt/lib/builtins/cpu_model
 
 rule cc
   command = $CC -MMD -MF \$out.d \$cflags \$FLAGS -c \$in -o \$out

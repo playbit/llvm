@@ -9,7 +9,7 @@ index bf3c5ddd5..def23d98e 100644
  lldb::addr_t ABISysV_arm64::FixCodeAddress(lldb::addr_t pc) {
    if (lldb::ProcessSP process_sp = GetProcessSP()) {
 -    if (process_sp->GetTarget().GetArchitecture().GetTriple().isOSLinux() &&
--        !process_sp->GetCodeAddressMask())
+-        process_sp->GetCodeAddressMask() == LLDB_INVALID_ADDRESS_MASK)
 +    const llvm::Triple &T = process_sp->GetTarget().GetArchitecture().GetTriple();
 +    if ((T.isOSLinux() || T.isOSPlaybit()) && !process_sp->GetCodeAddressMask())
        process_sp->SetCodeAddressMask(
@@ -20,7 +20,7 @@ index bf3c5ddd5..def23d98e 100644
  lldb::addr_t ABISysV_arm64::FixDataAddress(lldb::addr_t pc) {
    if (lldb::ProcessSP process_sp = GetProcessSP()) {
 -    if (process_sp->GetTarget().GetArchitecture().GetTriple().isOSLinux() &&
--        !process_sp->GetDataAddressMask())
+-        process_sp->GetDataAddressMask() == LLDB_INVALID_ADDRESS_MASK)
 +    const llvm::Triple &T = process_sp->GetTarget().GetArchitecture().GetTriple();
 +    if ((T.isOSLinux() || T.isOSPlaybit()) && !process_sp->GetDataAddressMask())
        process_sp->SetDataAddressMask(

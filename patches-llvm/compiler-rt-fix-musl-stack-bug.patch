@@ -11,25 +11,14 @@ diff --git a/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp b/comp
 index 42013f471..e3cb11f95 100644
 --- a/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp
 +++ b/compiler-rt/lib/sanitizer_common/sanitizer_linux_libcdep.cpp
-@@ -226,6 +226,11 @@ static atomic_uintptr_t thread_descriptor_size;
+@@ -226,5 +226,10 @@ static atomic_uintptr_t thread_descriptor_size;
  
  static uptr ThreadDescriptorSizeFallback() {
-   uptr val = 0;
 +
 +#if defined(_LIBCPP_HAS_MUSL_LIBC)
-+  val = 200; // sizeof(pthread) in pthread_impl.h
-+#else // defined(_LIBCPP_HAS_MUSL_LIBC)
-+
- #if defined(__x86_64__) || defined(__i386__) || defined(__arm__)
-   int major;
-   int minor;
-@@ -289,6 +294,9 @@ static uptr ThreadDescriptorSizeFallback() {
- #elif defined(__powerpc64__)
-   val = 1776; // from glibc.ppc64le 2.20-8.fc21
- #endif
-+
++  return 200; // sizeof(pthread) in pthread_impl.h
 +#endif // defined(_LIBCPP_HAS_MUSL_LIBC)
 +
-   return val;
- }
- 
+ #    if defined(__x86_64__) || defined(__i386__) || defined(__arm__) || \
+         SANITIZER_RISCV64
+   int major;

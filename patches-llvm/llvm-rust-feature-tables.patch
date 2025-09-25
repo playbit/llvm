@@ -23,6 +23,6 @@ index c1533ac8d..be289de71 100644
 +    return ProcFeatures;
 +  }
 +
-   virtual unsigned getHwMode() const { return 0; }
- 
-   /// Return the cache size in bytes for the given level of cache.
+   /// Return processor features.
+   ArrayRef<SubtargetFeatureKV> getAllProcessorFeatures() const {
+     return ProcFeatures;
