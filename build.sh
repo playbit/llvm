@@ -22,7 +22,7 @@ SYSROOT_TARGETS=(
   wasm32-playbit \
 )
 
-PKG_VERSION=3
+PKG_VERSION=4
 LLVM_VERSION=17.0.3
 LLVM_SHA256=be5a1e44d64f306bb44fce7d36e3b3993694e8e6122b2348608906283c176db8
 LLVM_URL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VERSION/llvm-project-$LLVM_VERSION.src.tar.xz
