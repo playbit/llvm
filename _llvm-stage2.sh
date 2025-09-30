@@ -30,6 +30,7 @@ DIST_COMPONENTS=(
   clang-format \
   clang-resource-headers \
   lld \
+  llc \
   dsymutil \
   llvm-ar \
   llvm-as \
