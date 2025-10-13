@@ -170,6 +170,11 @@ mkpatch clang-playbit.patch \
 	clang/lib/Lex/InitHeaderSearch.cpp \
 
 
+mkpatch clang-tools-extra.patch \
+	"Disable all but clang-tidy to avoid broken cross compilation of \"pseudo\"" \
+	clang-tools-extra/CMakeLists.txt \
+
+
 mkpatch lldb-playbit.patch \
 	"Playbit target" \
 	lldb/source/Plugins/ABI/AArch64/ABISysV_arm64.cpp \
@@ -202,7 +207,7 @@ git -C "$LLVM_SRC" diff base --name-only | sort > "$B_LOG"
 comm -3 "$A_LOG" "$B_LOG" > "$RECORDED_LOG"
 
 if [ -s "$RECORDED_LOG" ]; then
-	echo "Modified files NOT recorded in patches:"
+	echo "Modified files NOT recorded in patches: (edit $0 to fix)"
 	cat "$RECORDED_LOG"
 	echo "Command to show differences:"
 	while IFS= read line; do

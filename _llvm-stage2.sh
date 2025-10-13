@@ -5,6 +5,7 @@ DESTDIR=$LLVM_STAGE2_DIR
 # ENABLE_LLVM_DEV_FILES=true -- set in build.sh
 ENABLE_STATIC_LINKING=$LLVM_ENABLE_STATIC_LINKING
 ENABLE_LLDB=true
+ENABLE_CLANG_TIDY=true
 
 case "$TARGET" in
   *linux)
@@ -60,6 +61,9 @@ DIST_COMPONENTS=(
 if $ENABLE_LLDB; then
   DIST_COMPONENTS+=( lldb lldb-server liblldb )
 fi
+if $ENABLE_CLANG_TIDY; then
+  DIST_COMPONENTS+=( clang-tidy )
+fi
 # components without install targets
 EXTRA_COMPONENTS=()
 EXTRA_COMPONENTS+=( clang-tblgen )
@@ -78,6 +82,11 @@ if $ENABLE_LLVM_DEV_FILES; then
     lib/liblldMinGW.a \
     lib/liblldWasm.a \
   )
+  if $ENABLE_CLANG_TIDY; then
+    DIST_COMPONENTS+=(
+      clang-tidy-headers \
+    )
+  fi
 fi
 
 CMAKE_C_FLAGS=( \
@@ -257,6 +266,45 @@ esac
 # to build a "native" (host) version of itself, which will fail.
 EXTRA_CMAKE_ARGS+=( -DCMAKE_CROSSCOMPILING=OFF )
 
+# use stage1 compiler for building helpers during cross compilation
+if [ "$TARGET" != "$HOST_ARCH-$HOST_SYS" ]; then
+  EXTRA_CMAKE_ARGS+=(
+    -DLLVM_HOST_EXECUTABLE_SUFFIX= \
+    -DLLVM_NATIVE_TOOL_DIR="$LLVM_STAGE1_DIR/bin" \
+    -DLLVM_TABLEGEN="$LLVM_STAGE1_DIR/bin/llvm-tblgen" \
+    -DCLANG_TABLEGEN="$LLVM_STAGE1_DIR/bin/clang-tblgen" \
+  )
+
+  if $ENABLE_CLANG_TIDY; then
+    # Manually build clang-tidy-confusable-chars-gen as the cmake setup is broken.
+    # See clang-tools-extra/clang-tidy/misc/ConfusableTable/CMakeLists.txt
+    # See clang-tools-extra/clang-tidy/misc/CMakeLists.txt
+    # Note: We also apply a patch to clang-tools-extra/CMakeLists.txt that disables unused
+    # subprojects (e.g. pseudo) which requires yet more host tools, which fail to build with cmake.
+    mkdir -p "$BUILD_DIR/bin-host"
+    ARGS=( -std=c++17 -lc++ -lc++abi )
+    [ "$HOST_SYS" = macos ] &&
+      ARGS+=(--sysroot=$MAC_SDK)
+    set -x
+    "$CXX" \
+      "${ARGS[@]}" \
+      "-I$LLVM_STAGE1_DIR/include" \
+      "-L$LLVM_STAGE1_DIR/lib" -lLLVMSupport \
+      -o "$BUILD_DIR/bin-host/clang-tidy-confusable-chars-gen" \
+      "$LLVM_STAGE2_SRC/clang-tools-extra/clang-tidy/misc/ConfusableTable/BuildConfusableTable.cpp"
+    set +x
+    EXTRA_CMAKE_ARGS+=(
+      -DCLANG_TIDY_CONFUSABLE_CHARS_GEN="$BUILD_DIR/bin-host/clang-tidy-confusable-chars-gen" \
+    )
+
+  fi
+fi
+
+if $ENABLE_CLANG_TIDY; then
+  # needed for clang-tools-extra:
+  EXTRA_CMAKE_ARGS+=( -DCLANG_ENABLE_CLANGD=OFF )
+fi
+
 EXTRA_CMAKE_ARGS+=(
   -DHAVE_CXX_ATOMICS_WITHOUT_LIB=ON \
   -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=ON \
@@ -342,6 +390,9 @@ if $ENABLE_LLDB; then
 else
   LLVM_ENABLE_PROJECTS="clang;lld"
 fi
+if $ENABLE_CLANG_TIDY; then
+  LLVM_ENABLE_PROJECTS="$LLVM_ENABLE_PROJECTS;clang-tools-extra"
+fi
 
 cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
@@ -387,10 +438,8 @@ cmake -G Ninja "$LLVM_STAGE2_SRC/llvm" \
   -DCLANG_DEFAULT_OBJCOPY=llvm-objcopy \
   -DCLANG_PLUGIN_SUPPORT=OFF \
   -DCLANG_VENDOR=Playbit \
+  -DCLANG_INCLUDE_TESTS=OFF \
   -DLIBCLANG_BUILD_STATIC=ON \
-  \
-  -DLLVM_TABLEGEN="$LLVM_STAGE1_DIR/bin/llvm-tblgen" \
-  -DCLANG_TABLEGEN="$LLVM_STAGE1_DIR/bin/clang-tblgen" \
   \
   -DLLVM_ENABLE_ZLIB=FORCE_ON \
   -DZLIB_LIBRARY="$ZLIB_DIR/lib/libz.a" \

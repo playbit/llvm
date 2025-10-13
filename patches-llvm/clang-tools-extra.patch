@@ -1,0 +1,38 @@
+Disable all but clang-tidy to avoid broken cross compilation of "pseudo"
+
+diff --git a/clang-tools-extra/CMakeLists.txt b/clang-tools-extra/CMakeLists.txt
+index 6a3f74172..635318f6a 100644
+--- a/clang-tools-extra/CMakeLists.txt
++++ b/clang-tools-extra/CMakeLists.txt
+@@ -13,20 +13,20 @@ if(CLANG_INCLUDE_TESTS)
+   endif()
+ endif()
+ 
+-add_subdirectory(clang-apply-replacements)
+-add_subdirectory(clang-reorder-fields)
+-add_subdirectory(modularize)
++# add_subdirectory(clang-apply-replacements)
++# add_subdirectory(clang-reorder-fields)
++# add_subdirectory(modularize)
+ add_subdirectory(clang-tidy)
+ 
+-add_subdirectory(clang-change-namespace)
+-add_subdirectory(clang-doc)
+-add_subdirectory(clang-include-fixer)
+-add_subdirectory(clang-move)
+-add_subdirectory(clang-query)
++# add_subdirectory(clang-change-namespace)
++# add_subdirectory(clang-doc)
++# add_subdirectory(clang-include-fixer)
++# add_subdirectory(clang-move)
++# add_subdirectory(clang-query)
+ add_subdirectory(include-cleaner)
+-add_subdirectory(pp-trace)
+-add_subdirectory(pseudo)
+-add_subdirectory(tool-template)
++# add_subdirectory(pp-trace)
++# add_subdirectory(pseudo)
++# add_subdirectory(tool-template)
+ 
+ option(CLANG_TOOLS_EXTRA_INCLUDE_DOCS "Generate build targets for the Clang Extra Tools docs."
+   ${LLVM_INCLUDE_DOCS})
