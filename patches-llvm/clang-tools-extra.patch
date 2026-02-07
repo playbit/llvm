@@ -31,7 +31,7 @@ index 6a3f74172..635318f6a 100644
 -add_subdirectory(pseudo)
 -add_subdirectory(tool-template)
 +# add_subdirectory(pp-trace)
-+# add_subdirectory(pseudo)
++add_subdirectory(pseudo)
 +# add_subdirectory(tool-template)
  
  option(CLANG_TOOLS_EXTRA_INCLUDE_DOCS "Generate build targets for the Clang Extra Tools docs."

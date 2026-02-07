@@ -6,6 +6,7 @@ DESTDIR=$LLVM_STAGE2_DIR
 ENABLE_STATIC_LINKING=$LLVM_ENABLE_STATIC_LINKING
 ENABLE_LLDB=true
 ENABLE_CLANG_TIDY=true
+ENABLE_CLANGD=true
 
 case "$TARGET" in
   *linux)
@@ -58,14 +59,18 @@ DIST_COMPONENTS=(
   llvm-tblgen \
   llvm-xray \
 )
+EXTRA_COMPONENTS=() # components without install targets
 if $ENABLE_LLDB; then
   DIST_COMPONENTS+=( lldb lldb-server liblldb )
 fi
 if $ENABLE_CLANG_TIDY; then
   DIST_COMPONENTS+=( clang-tidy )
 fi
-# components without install targets
-EXTRA_COMPONENTS=()
+if $ENABLE_CLANGD; then
+  DIST_COMPONENTS+=( clangd )
+  EXTRA_COMPONENTS+=( clangd-indexer )
+  # note: in later versions of llvm, clangd-indexer can be included in DIST_COMPONENTS
+fi
 EXTRA_COMPONENTS+=( clang-tblgen )
 if $ENABLE_LLVM_DEV_FILES; then
   DIST_COMPONENTS+=(
@@ -121,6 +126,14 @@ else
   EXTRA_CMAKE_ARGS+=( -DLLVM_LINK_LLVM_DYLIB=ON )
   EXTRA_CMAKE_ARGS+=( -DLLVM_BUILD_LLVM_DYLIB=ON )
   EXTRA_CMAKE_ARGS+=( -DLLVM_ENABLE_PLUGINS=OFF )
+fi
+
+if $ENABLE_CLANGD; then
+  EXTRA_CMAKE_ARGS+=(
+    -DLLVM_ENABLE_THREADS=ON \
+    -DCLANG_ENABLE_CLANGD=ON \
+    -DCLANG_BUILD_TOOLS=ON \
+  )
 fi
 
 case $TARGET in
@@ -300,8 +313,8 @@ if [ "$TARGET" != "$HOST_ARCH-$HOST_SYS" ]; then
   fi
 fi
 
-if $ENABLE_CLANG_TIDY; then
-  # needed for clang-tools-extra:
+if $ENABLE_CLANG_TIDY && ! $ENABLE_CLANGD; then
+  # CLANG_ENABLE_CLANGD defaults to ON in clang-tools-extra
   EXTRA_CMAKE_ARGS+=( -DCLANG_ENABLE_CLANGD=OFF )
 fi
 
@@ -390,7 +403,7 @@ if $ENABLE_LLDB; then
 else
   LLVM_ENABLE_PROJECTS="clang;lld"
 fi
-if $ENABLE_CLANG_TIDY; then
+if $ENABLE_CLANG_TIDY || $ENABLE_CLANGD; then
   LLVM_ENABLE_PROJECTS="$LLVM_ENABLE_PROJECTS;clang-tools-extra"
 fi
 
@@ -501,6 +514,12 @@ mv "$DESTDIR/bin/clang-${LLVM_VERSION%%.*}" "$DESTDIR/bin/clang"
 
 # no install target for clang-tblgen
 install -vm 0755 bin/clang-tblgen "$DESTDIR/bin/clang-tblgen"
+$STRIP "$DESTDIR/bin/clang-tblgen"
+
+# no install target for clangd-indexer
+install -vm 0755 bin/clangd-indexer "$DESTDIR/bin/clangd-indexer"
+$STRIP "$DESTDIR/bin/clangd-indexer"
+$STRIP "$DESTDIR/bin/clangd"
 
 if ! $ENABLE_STATIC_LINKING; then
   mkdir -p "$DESTDIR/lib"
