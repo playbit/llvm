@@ -1,0 +1,16 @@
+Move .cfi_startproc after function label for outline helpers on Apple
+
+diff --git a/compiler-rt/lib/builtins/assembly.h b/compiler-rt/lib/builtins/assembly.h
+index 7f47b6b02..8cb5f61f1 100644
+--- a/compiler-rt/lib/builtins/assembly.h
++++ b/compiler-rt/lib/builtins/assembly.h
+@@ -260,9 +260,10 @@
+   .globl name SEPARATOR                                                        \
+   SYMBOL_IS_FUNC(name) SEPARATOR                                               \
+   DECLARE_SYMBOL_VISIBILITY_UNMANGLED(name) SEPARATOR                          \
+-  CFI_START SEPARATOR                                                          \
+   DECLARE_FUNC_ENCODING                                                        \
+-  name: SEPARATOR BTI_C
++  name: SEPARATOR                                          \
++  CFI_START SEPARATOR                                      \
++  BTI_C

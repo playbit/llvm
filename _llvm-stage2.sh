@@ -58,6 +58,9 @@ DIST_COMPONENTS=(
   llvm-symbolizer \
   llvm-tblgen \
   llvm-xray \
+  scan-build-py \
+  scan-build \
+  scan-view \
 )
 EXTRA_COMPONENTS=() # components without install targets
 if $ENABLE_LLDB; then
@@ -287,6 +290,15 @@ if [ "$TARGET" != "$HOST_ARCH-$HOST_SYS" ]; then
     -DLLVM_TABLEGEN="$LLVM_STAGE1_DIR/bin/llvm-tblgen" \
     -DCLANG_TABLEGEN="$LLVM_STAGE1_DIR/bin/clang-tblgen" \
   )
+  if [ -x "$LLVM_STAGE1_DIR/bin/clang-pseudo-gen" ]; then
+    EXTRA_CMAKE_ARGS+=(
+      -DCLANG_PSEUDO_GEN="$LLVM_STAGE1_DIR/bin/clang-pseudo-gen" \
+      -Dpseudo_gen="$LLVM_STAGE1_DIR/bin/clang-pseudo-gen" \
+      -Dpseudo_gen_target= \
+    )
+  else
+    echo "warning: missing host clang-pseudo-gen at $LLVM_STAGE1_DIR/bin/clang-pseudo-gen" >&2
+  fi
 
   if $ENABLE_CLANG_TIDY; then
     # Manually build clang-tidy-confusable-chars-gen as the cmake setup is broken.

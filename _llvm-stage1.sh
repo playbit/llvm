@@ -30,7 +30,10 @@ case "$HOST_SYS" in
       -DCMAKE_OSX_DEPLOYMENT_TARGET=$MAC_TARGET_VERSION \
       -DCMAKE_SYSROOT=$MAC_SDK \
       -DCMAKE_OSX_SYSROOT=$MAC_SDK \
+      -DOSX_SYSROOT=$MAC_SDK \
+      -DDARWIN_macosx_CACHED_SYSROOT=$MAC_SDK \
     )
+    echo "Using MAC_SDK=$MAC_SDK"
     ;;
   linux)
     EXTRA_CMAKE_ARGS+=(
@@ -58,6 +61,21 @@ case "$HOST_SYS" in
     ;;
 esac
 
+if [ "$HOST_SYS" = "macos" ]; then
+  # Ensure compiler-rt uses our SDK sysroot (not Xcode's) when /usr/include/c++ is missing.
+  if ! grep -q "CMAKE_OSX_SYSROOT" \
+    "$LLVM_STAGE1_SRC/compiler-rt/cmake/base-config-ix.cmake"
+  then
+    patch -p1 -d "$LLVM_STAGE1_SRC" < "$LLVM_PATCHDIR/compiler-rt-osx-sysroot.patch"
+  fi
+  # Move .cfi_startproc after function labels for Apple assemblers.
+  if grep -q "name: SEPARATOR BTI_C" \
+    "$LLVM_STAGE1_SRC/compiler-rt/lib/builtins/assembly.h"
+  then
+    patch -p1 -d "$LLVM_STAGE1_SRC" < "$LLVM_PATCHDIR/compiler-rt-apple-cfi-startproc.patch"
+  fi
+fi
+
 CMAKE_C_FLAGS="${CFLAGS:-} ${CMAKE_C_FLAGS[@]:-}"
 CMAKE_LD_FLAGS="${LDFLAGS:-} ${CMAKE_LD_FLAGS[@]:-}"
 
@@ -83,7 +101,7 @@ cmake -G Ninja -Wno-dev "$LLVM_STAGE1_SRC/llvm" \
   -DCMAKE_MODULE_LINKER_FLAGS="$CMAKE_LD_FLAGS" \
   \
   -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly" \
-  -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt;lldb" \
+  -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt;lldb;clang-tools-extra" \
   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
   -DLLVM_DISTRIBUTION_COMPONENTS="$(_array_join ";" "${DIST_COMPONENTS[@]:-}")" \
   -DLLVM_ENABLE_MODULES=OFF \
@@ -116,6 +134,7 @@ cmake -G Ninja -Wno-dev "$LLVM_STAGE1_SRC/llvm" \
   -DCLANG_ENABLE_OBJC_REWRITER=OFF \
   -DCLANG_ENABLE_ARCMT=OFF \
   -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+  -DCLANG_ENABLE_CLANGD=OFF \
   -DCLANG_DEFAULT_CXX_STDLIB=libc++ \
   -DCLANG_DEFAULT_RTLIB=compiler-rt \
   -DCLANG_DEFAULT_UNWINDLIB=libunwind \
@@ -171,6 +190,7 @@ ninja -j$NCPU \
   llvm-headers \
   clang-tblgen \
   lldb-tblgen \
+  clang-pseudo-gen \
   cxxabi
 
 ninja -j$NCPU \
@@ -187,6 +207,7 @@ ninja -j$NCPU \
 
 cp -av bin/clang-tblgen "$LLVM_STAGE1_DIR/bin/clang-tblgen"
 cp -av bin/lldb-tblgen "$LLVM_STAGE1_DIR/bin/lldb-tblgen"
+cp -av bin/clang-pseudo-gen "$LLVM_STAGE1_DIR/bin/clang-pseudo-gen"
 ln -fsv llvm-objcopy "$LLVM_STAGE1_DIR/bin/llvm-strip"
 ln -fsv llvm-libtool-darwin "$LLVM_STAGE1_DIR/bin/libtool"
 

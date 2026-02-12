@@ -1,0 +1,36 @@
+Use CMAKE_OSX_SYSROOT/CMAKE_SYSROOT when set instead of xcrun for OSX_SYSROOT
+
+diff --git a/compiler-rt/cmake/base-config-ix.cmake b/compiler-rt/cmake/base-config-ix.cmake
+index 34bf4962d..2d6af98a8 100644
+--- a/compiler-rt/cmake/base-config-ix.cmake
++++ b/compiler-rt/cmake/base-config-ix.cmake
+@@ -122,15 +122,21 @@
+   # not the command line tools (or is using macOS 10.14 or newer). If this is
+   # the case, we need to find the OS X sysroot to pass to clang.
+   if(NOT EXISTS /usr/include/c++)
+-    execute_process(COMMAND xcrun -sdk macosx --show-sdk-path
+-       OUTPUT_VARIABLE OSX_SYSROOT
+-       ERROR_QUIET
+-       OUTPUT_STRIP_TRAILING_WHITESPACE)
+-    if (NOT OSX_SYSROOT OR NOT EXISTS ${OSX_SYSROOT})
+-      message(WARNING "Detected OSX_SYSROOT ${OSX_SYSROOT} does not exist")
+-    else()
+-      message(STATUS "Found OSX_SYSROOT: ${OSX_SYSROOT}")
++    if(CMAKE_OSX_SYSROOT AND EXISTS "${CMAKE_OSX_SYSROOT}")
++      set(OSX_SYSROOT "${CMAKE_OSX_SYSROOT}")
++      message(STATUS "Using OSX_SYSROOT: ${OSX_SYSROOT}")
+       set(OSX_SYSROOT_FLAG "-isysroot${OSX_SYSROOT}")
++    else()
++      execute_process(COMMAND xcrun -sdk macosx --show-sdk-path
++         OUTPUT_VARIABLE OSX_SYSROOT
++         ERROR_QUIET
++         OUTPUT_STRIP_TRAILING_WHITESPACE)
++      if (NOT OSX_SYSROOT OR NOT EXISTS ${OSX_SYSROOT})
++        message(WARNING "Detected OSX_SYSROOT ${OSX_SYSROOT} does not exist")
++      else()
++        message(STATUS "Found OSX_SYSROOT: ${OSX_SYSROOT}")
++        set(OSX_SYSROOT_FLAG "-isysroot${OSX_SYSROOT}")
++      endif()
+     endif()
+   else()
+     set(OSX_SYSROOT_FLAG "")

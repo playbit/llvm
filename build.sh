@@ -22,7 +22,7 @@ SYSROOT_TARGETS=(
   wasm32-playbit \
 )
 
-PKG_VERSION=5
+PKG_VERSION=6
 LLVM_VERSION=17.0.3
 LLVM_SHA256=be5a1e44d64f306bb44fce7d36e3b3993694e8e6122b2348608906283c176db8
 LLVM_URL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VERSION/llvm-project-$LLVM_VERSION.src.tar.xz
@@ -40,9 +40,9 @@ WASI_GIT_TAG=wasi-sdk-21
 WASI_SHA256=4a2a3e3b120ba1163c57f34ac79c3de720a8355ee3a753d81f1f0c58c4cf6017
 WASI_URL=https://github.com/WebAssembly/wasi-libc/archive/refs/tags/$WASI_GIT_TAG.tar.gz
 
-MAC_SDK_VERSION=11.3
-MAC_SDK_SHA256=196e1acde8bf6a8165f5c826531f3c9ce2bd72b0a791649f5b36ff70ff24b824
-MAC_SDK_URL="https://d.rsms.me/macos-sdk/MacOSX${MAC_SDK_VERSION}.sdk.tar.xz"
+MAC_SDK_VERSION=14.4
+MAC_SDK_SHA256=624c32945247c8023d400d68b688cea7a0cb8e74d4209e5fd5f8ed3cfb34a526
+MAC_SDK_URL=https://files.playb.it/MacOSX${MAC_SDK_VERSION}.sdk.tar.xz
 
 ZLIB_VERSION=1.3.1
 ZLIB_SHA256=38ef96b8dfe510d42707d9c781877914792541133e1870841463bfa73f883e32
@@ -197,7 +197,7 @@ if [ "$HOST_SYS" = "macos" ]; then
   if [ $HOST_ARCH = x86_64 ]; then
     MAC_TARGET_VERSION=10.15
   else
-    MAC_TARGET_VERSION=11.0
+    MAC_TARGET_VERSION=12.0
   fi
   # -platform_version <platform> <min_version> <sdk_version>
   STAGE1_LDFLAGS+=( -Wl,-platform_version,macos,$MAC_TARGET_VERSION,$MAC_SDK_VERSION )
@@ -362,6 +362,8 @@ LLVM_STAGE1_DIR=$BUILD_DIR/llvm
 _run_if_missing "$LLVM_STAGE1_DIR/bin/clang" _llvm-stage1.sh llvm-s1
 echo "Using llvm-stage1 at ${LLVM_STAGE1_DIR##$PWD0/}/"
 export PATH=$LLVM_STAGE1_DIR/bin:$PATH
+
+[ -z "${STOP_AFTER_LLVM_S1_BUILD:-}" ] || exit 0
 
 # ————————————————————————————————————————————————————————————————————————————
 # stage 2
