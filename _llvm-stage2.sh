@@ -504,7 +504,7 @@ if [ -n "${LLVM_STAGE2_ONLY_CONFIGURE:-}" ]; then
   exit 0
 fi
 
-echo "———————————————————————— build ————————————————————————"
+echo "———————————————————————— [llvm-stage2] build ————————————————————————"
 ninja -j$NCPU distribution ${EXTRA_COMPONENTS[@]:-}
 
 
@@ -515,7 +515,7 @@ if [ -n "${PB_LLVM_STOP_AFTER_BUILD:-}" ]; then
 fi
 
 
-echo "———————————————————————— install ————————————————————————"
+echo "———————————————————————— [llvm-stage2] install ————————————————————————"
 rm -rf "$DESTDIR"
 mkdir -p "$DESTDIR"
 DESTDIR="$DESTDIR" ninja -j$NCPU install-distribution-stripped
