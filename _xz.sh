@@ -12,6 +12,15 @@ if ! command -v autoreconf >/dev/null; then
   exit 1
 fi
 
+if ! command -v aclocal >/dev/null; then
+  echo "aclocal not found in PATH" >&2
+  case $HOST_SYS in
+    macos) echo "Try: brew install automake" >&2;;
+    linux) echo "Try: apk add automake" >&2;;
+  esac
+  exit 1
+fi
+
 echo "autoreconf > autoreconf.out"
 autoreconf -fi > autoreconf.out
 
