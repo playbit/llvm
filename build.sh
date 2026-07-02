@@ -229,7 +229,7 @@ EOF
 fi
 $PRINT_CONFIG && exit 0
 
-NCPU=$(nproc)
+NCPU=$(sysctl -n hw.logicalcpu)
 
 # llvm dependencies
 #   Build:
